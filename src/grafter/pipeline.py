@@ -27,6 +27,7 @@ from grafter.gitops import scrub as scrub_urls
 from grafter.guard import Tier, check
 from grafter.lock import RunLock, check_kill_switch
 from grafter.prbody import LABEL_COLORS, fingerprint_for, render_pr
+from grafter.report import REPORT_FILE, render_report
 from grafter.runlog import RunLog, new_run_id
 from grafter.runner import CommandRunner
 from grafter.store import TRANSITIONS, ChangeStatus, Store
@@ -167,8 +168,13 @@ def run_night(cfg: Config, deps: RunDeps, dry_run: bool, run_id: str | None = No
                 store.finish_run(
                     run_id, status, opened, summary.tokens, 0.0, summary.stopped_reason
                 )
+                report = log.run_dir / REPORT_FILE
+                with report.open("w", encoding="utf-8", newline="\n") as fh:
+                    fh.write(render_report(summary, cfg))
+                summary.report_path = str(report)
                 log.event(
                     "run_finished",
+                    report=str(report),
                     status=status,
                     stopped_reason=summary.stopped_reason,
                     prs=len(summary.prs),

@@ -258,6 +258,12 @@ def test_good_change_opens_one_pr(make_cfg: Callable[..., Config], sandbox_origi
     assert run_row(cfg, s.run_id)["prs_opened"] == 1
     assert run_row(cfg, s.run_id)["status"] == "ok"
 
+    report = Path(s.report_path)
+    assert report == cfg.paths().runs_dir / s.run_id / "report.md"
+    md = report.read_text(encoding="utf-8")
+    assert f"[#1](https://github.example/{GITHUB_REPO}/pull/1)" in md
+    assert "- PRs opened: 1 (limit 1)" in md
+
     kinds = events(cfg, s)
     assert kinds[0] == "run_started" and kinds[-1] == "run_finished"
     assert "pr_opened" in kinds and "gates" in kinds and "guard" in kinds
@@ -309,6 +315,7 @@ def test_protected_file_rejected_nothing_pushed(
     s = run_night(cfg, deps_for(sandbox_origin, Engines(bad), gh), dry_run=False)
     rej = next(r for r in s.rejected if r["target"] == TRACE)
     assert any("protected" in r for r in rej["reasons"])
+    assert "touches protected paths" in Path(s.report_path).read_text(encoding="utf-8")
     assert s.prs == [] and gh.pulls == []
     assert bare_refs(sandbox_origin) == refs
     statuses = {c["fingerprint"]: (c["status"], c["decided_by"]) for c in changes(cfg)}
@@ -441,6 +448,8 @@ def test_dry_run_pushes_nothing(make_cfg: Callable[..., Config], sandbox_origin:
     assert run_row(cfg, s.run_id)["prs_opened"] == 0
     assert run_row(cfg, s.run_id)["dry_run"] == 1
     assert "would_open_pr" in events(cfg, s)
+    md = Path(s.report_path).read_text(encoding="utf-8")
+    assert "## Would open (dry run)" in md and "would open PR" in md
 
     # The dry-run record does not block the next run.
     s2 = run_night(cfg, deps_for(sandbox_origin, Engines(GOOD)), dry_run=True)
@@ -548,6 +557,7 @@ def test_missing_charter_fails_run(make_cfg: Callable[..., Config], sandbox_orig
     s = run_night(cfg, deps_for(sandbox_origin, Engines(GOOD)), dry_run=True)
     assert s.failed and "FileNotFoundError" in s.stopped_reason
     assert run_row(cfg, s.run_id)["status"] == "failed"
+    assert "FileNotFoundError" in Path(s.report_path).read_text(encoding="utf-8")
     assert not cfg.paths().lock_file.exists()
 
 
