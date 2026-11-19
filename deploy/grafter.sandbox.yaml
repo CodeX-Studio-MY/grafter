@@ -6,7 +6,9 @@ repos:
     default_branch: main
     language: python
     test_command: pytest -q
-    coverage_command: pytest -q --cov --cov-report=json
+    coverage_command: pytest -q -p no:cacheprovider --cov --cov-report=json:coverage.json
+    coverage_report: coverage.json
+    coverage_format: coverage-json
     test_paths:
       - tests/**
     sandbox_image: python:3.12-slim

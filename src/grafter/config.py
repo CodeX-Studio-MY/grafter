@@ -7,12 +7,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from grafter.charter import REPO_NAME_PATTERN, ChangeType, normalise_patterns
+from grafter.charter import REPO_NAME_PATTERN, ChangeType, normalise_path, normalise_patterns
 
 
 class Branches(BaseModel):
@@ -105,6 +105,8 @@ class RepoConfig(BaseModel):
     language: str = Field(min_length=1)  # free text: dotnet, node, flutter, python, ...
     test_command: str = Field(min_length=1)
     coverage_command: str = ""
+    coverage_report: str = ""  # repo-relative file coverage_command writes; empty = none
+    coverage_format: Literal["coverage-json", "lcov"] = "coverage-json"
     test_paths: list[str] = Field(min_length=1)  # globs; a `test` change may touch only these
     sandbox_image: str = ""  # Docker image; empty = engine default
 
@@ -112,6 +114,11 @@ class RepoConfig(BaseModel):
     @classmethod
     def _norm_test_paths(cls, v: list[str]) -> list[str]:
         return normalise_patterns(v)
+
+    @field_validator("coverage_report")
+    @classmethod
+    def _norm_coverage_report(cls, v: str) -> str:
+        return normalise_path(v) if v else v
 
 
 class Config(BaseModel):
