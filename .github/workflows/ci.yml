@@ -17,5 +17,6 @@ jobs:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
       - run: ruff check .
+      - run: ruff format --check .
       - run: pytest -q
       - run: grafter validate examples/acme-harvest/grafter.charter.yaml

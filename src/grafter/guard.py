@@ -39,8 +39,9 @@ def check(task: Task, result: RunResult, charter: Charter) -> Verdict:
 
     if any(charter.needs_review(f) for f in result.changed_files):
         return Verdict(allowed=True, tier=Tier.REVIEW, reasons=["touches review paths"])
-    if task.change_type in (ChangeType.DEPENDENCY, ChangeType.SECURITY) and len(
-        result.changed_files
-    ) <= 2:
+    if (
+        task.change_type in (ChangeType.DEPENDENCY, ChangeType.SECURITY)
+        and len(result.changed_files) <= 2
+    ):
         return Verdict(allowed=True, tier=Tier.AUTO)
     return Verdict(allowed=True, tier=Tier.APPROVE)
