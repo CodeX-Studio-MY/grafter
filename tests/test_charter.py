@@ -37,15 +37,24 @@ def test_charter_always_protects_itself():
 def test_path_cannot_be_protected_and_review():
     with pytest.raises(ValidationError):
         Charter(
-            solution="x", purpose="y", core_domains=["a"], allowed_change_types=["bugfix"],
-            protected_paths=["db/"], review_paths=["db/"],
+            solution="x",
+            purpose="y",
+            core_domains=["a"],
+            allowed_change_types=["bugfix"],
+            protected_paths=["db/"],
+            review_paths=["db/"],
         )
 
 
 def test_unknown_field_rejected():
     with pytest.raises(ValidationError):
-        Charter(solution="x", purpose="y", core_domains=["a"],
-                allowed_change_types=["bugfix"], features="yes")
+        Charter(
+            solution="x",
+            purpose="y",
+            core_domains=["a"],
+            allowed_change_types=["bugfix"],
+            features="yes",
+        )
 
 
 def test_guard_rejects_protected_path(charter):
@@ -64,8 +73,9 @@ def test_guard_review_paths_are_tier2(charter):
 
 
 def test_guard_small_dependency_bump_is_tier0(charter):
-    v = check(task(ChangeType.DEPENDENCY), RunResult(success=True, changed_files=["a.csproj"]),
-              charter)
+    v = check(
+        task(ChangeType.DEPENDENCY), RunResult(success=True, changed_files=["a.csproj"]), charter
+    )
     assert v.allowed and v.tier == Tier.AUTO
 
 

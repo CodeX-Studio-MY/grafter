@@ -1,17 +1,17 @@
 # Grafter — TODO
 
-Status board and single source of project status. One item = one branch + one PR.
+Status board and single source of project status. One group of related items = one branch + one PR; one commit per item.
 Claude ticks a box only after its **Done when** check passed, in the same PR as the work.
 
 Legend: `[ ]` todo · `[x]` done · 🧑 needs the user (Claude cannot do it alone) · ⚖️ decision needed
 
 ## Workflow for every item
 
-1. `git switch -c <type>/<item-id>-<slug>` from fresh `main` (e.g. `fix/0B1-path-normalise`).
+1. `git switch -c <type>/<ids>-<slug>` from fresh `main` (e.g. `fix/0B1-0B2-paths`).
 2. Write tests first, then code.
-3. `ruff check . && pytest -q` green locally.
+3. `ruff check . && ruff format --check . && pytest -q` green locally (`pre-commit run -a`).
 4. Run the item's **Done when** check; paste the output into the PR body.
-5. PR title `[<item-id>] <summary>`; tick the box in this file in the same PR.
+5. One commit per item, message `[<id>] <summary>`. PR title `[<ids>] <summary>`; tick the boxes in this file in the same PR.
 6. User reviews and merges. Next item.
 
 Never tick an unverified item. If an item is split, add sub-items instead of ticking partially.
@@ -22,7 +22,7 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 
 ### 0A Repo hygiene
 - [x] **0A1** Add `TODO.md`, link from `CLAUDE.md` and `README.md`. Done when: PR merged.
-- [ ] **0A2** Pre-commit hooks (ruff, ruff-format, trailing whitespace) + `ruff format --check` in CI. Done when: CI runs format check.
+- [x] **0A2** Pre-commit hooks (ruff, ruff-format, trailing whitespace) + `ruff format --check` in CI. Done when: CI runs format check.
 - [ ] **0A3** mypy (strict on `src/`) in dev deps + CI. Done when: `mypy src` clean.
 - [ ] **0A4** pytest-cov in CI, fail under current coverage. Done when: coverage % shown in CI log.
 - [ ] **0A5** PR template (summary, TODO id, verification output) + `CODEOWNERS`. Done when: a new PR shows the template.
