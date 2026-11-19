@@ -26,6 +26,10 @@ class RunResult:
     summary: str = ""
     risks: list[str] = field(default_factory=list)
     tokens_used: int = 0
+    lines_added: int = 0
+    lines_removed: int = 0
+    deleted_files: list[str] = field(default_factory=list)
+    diff: str = ""
 
 
 class AgentEngine(Protocol):
