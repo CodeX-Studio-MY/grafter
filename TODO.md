@@ -36,7 +36,7 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [ ] **0B5** Guard: a `test` change may touch only test paths (per-repo `test_paths` globs) and may not delete test files or test functions. Done when: tests.
 - [ ] **0B6** Guard: secret scan of the diff (regex set or `detect-secrets`) → reject. Done when: test with a fake key.
 - [ ] **0B7** Per-repo config: `name`, `default_branch`, `language`, `test_command`, `coverage_command`, `test_paths`, `sandbox_image`. Charter paths become repo-scoped. Update example + add `grafter validate --config`. Done when: example validates.
-- [ ] **0B8** Config: `kill_switch` (file/env), `dry_run`, `nightly_focus` rotation, `model`, GitHub App ids (ids only; secrets via env). Done when: tests.
+- [x] **0B8** Config: `kill_switch` (file/env), `dry_run`, `nightly_focus` rotation, `model`, GitHub App ids (ids only; secrets via env). Done when: tests.
 
 ### 0C Pilot preparation (outside this repo)
 - [ ] **0C1** 🧑 Write the pilot's `grafter.charter.yaml` + `AGENTS.md` in the PILOT repos (Claude can draft it in a pilot-repo session). Done when: `grafter validate` passes on it.
