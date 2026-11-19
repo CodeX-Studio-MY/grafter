@@ -5,6 +5,7 @@ import pytest
 
 from grafter.charter import ChangeType
 from grafter.engines.base import Task
+from grafter.finder import fingerprint as finder_fingerprint
 from grafter.guard import Tier
 from grafter.prbody import (
     FINGERPRINT_MARKER,
@@ -156,6 +157,8 @@ def test_fingerprint_for_is_stable_and_scoped() -> None:
     # The task id is not part of the fingerprint: a rerun gets a new id, same change.
     rerun = Task("t-99", "api", ChangeType.TEST, "other ref", "other words")
     assert fingerprint_for(rerun, "src/billing/rounding.py") == fp
+    # One formula: the finder's fingerprint (task ids) and the PR marker agree.
+    assert fp == finder_fingerprint("api", ChangeType.TEST, "src/billing/rounding.py")
 
 
 def test_fingerprint_for_renders() -> None:

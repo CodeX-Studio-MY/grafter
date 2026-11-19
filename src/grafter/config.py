@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
@@ -47,6 +48,7 @@ class Models(BaseModel):
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
 _SECRET_PARTS = ("private_key", "secret", "password", "token")
 _SECRET_ALLOW = frozenset({"token_budget_per_night"})
+_URL_USERINFO = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://[^/@]*@")
 
 
 class KillSwitch(BaseModel):
@@ -71,6 +73,7 @@ class GitHubApp(BaseModel):
 
     app_id: int | None = None
     installation_id: int | None = None
+    api_url: str = Field(default="https://api.github.com", pattern=r"^https?://")
 
 
 def _is_secret_key(key: str) -> bool:
@@ -109,6 +112,16 @@ class RepoConfig(BaseModel):
     coverage_format: Literal["coverage-json", "lcov"] = "coverage-json"
     test_paths: list[str] = Field(min_length=1)  # globs; a `test` change may touch only these
     sandbox_image: str = ""  # Docker image; empty = engine default
+    # Clone from here instead of github.com (local path or URL without credentials).
+    # For offline testing; real runs leave it empty and clone with the App token.
+    clone_url: str = ""
+
+    @field_validator("clone_url")
+    @classmethod
+    def _no_credentials(cls, v: str) -> str:
+        if _URL_USERINFO.search(v):
+            raise ValueError("clone_url must not contain credentials (user:token@)")
+        return v
 
     @field_validator("test_paths")
     @classmethod
@@ -136,6 +149,16 @@ class Config(BaseModel):
     kill_switch: KillSwitch = KillSwitch()
     nightly_focus: list[ChangeType] = Field(default_factory=lambda: [ChangeType.TEST], min_length=1)
     github_app: GitHubApp = GitHubApp()
+    charter_repo: str = ""  # repo `name` whose work tree holds the charter; empty = first repo
+    charter_file: str = "grafter.charter.yaml"  # path inside the charter repo
+    runner: Literal["docker", "local"] = "docker"  # local = repo commands on this host (tests)
+    git_author_name: str = Field(default="Grafter", min_length=1)
+    git_author_email: str = Field(default="grafter-bot@users.noreply.github.com", min_length=3)
+
+    @field_validator("charter_file")
+    @classmethod
+    def _norm_charter_file(cls, v: str) -> str:
+        return normalise_path(v)
 
     @model_validator(mode="before")
     @classmethod
@@ -154,7 +177,15 @@ class Config(BaseModel):
         dupes = sorted({n for n in names if names.count(n) > 1})
         if dupes:
             raise ValueError(f"duplicate repo names: {dupes}")
+        if self.charter_repo and self.charter_repo not in names:
+            raise ValueError(
+                f"charter_repo {self.charter_repo!r} is not a configured repo ({names})"
+            )
         return self
+
+    def charter_repo_config(self) -> RepoConfig:
+        """The repo whose work tree holds the charter (`charter_repo`, else the first)."""
+        return self.repo(self.charter_repo) if self.charter_repo else self.repos[0]
 
     def repo(self, name: str) -> RepoConfig:
         for r in self.repos:

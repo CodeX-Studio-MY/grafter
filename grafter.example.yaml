@@ -12,6 +12,7 @@ repos:                    # one entry per repo of the solution (fictional exampl
       - tests/**
       - "**/*.Tests/**"
     sandbox_image: mcr.microsoft.com/dotnet/sdk:8.0   # empty = engine default
+    # clone_url: /srv/git/api.git   # offline testing only: clone from here, not github.com
   - name: web
     github: your-org/your-web
     language: node
@@ -42,7 +43,12 @@ limits:
   max_prs_per_night: 3
   token_budget_per_night: 500000
   usd_budget_per_night: 5.0   # hard cap, enforced on the LiteLLM virtual key
-engine: openhands
+engine: openhands         # openhands (lands in 1C3) or noop (changes nothing; pipeline test)
+runner: docker            # docker (lands in 1D2b) or local (repo commands on this host; testing only)
+charter_repo: api         # repo holding the charter; empty = first repo
+charter_file: grafter.charter.yaml   # path inside charter_repo
+git_author_name: Grafter
+git_author_email: grafter-bot@users.noreply.github.com
 tier0_auto_merge: false   # opt-in
 llm_gateway_url: http://localhost:4000
 models:                   # LiteLLM model name per role, routed via the gateway (D15)
@@ -59,3 +65,4 @@ nightly_focus:            # rotates one per night: test, security, performance, 
 github_app:               # ids only; the private key comes from an env var, never this file
   app_id: null
   installation_id: null
+  api_url: https://api.github.com
