@@ -12,6 +12,7 @@
 - One PR = one change. Cap 3–5 PRs and a token budget per night.
 - Rotating nightly focus (security, performance, tests, mobile).
 - Tests first: on a weakly tested solution, the first job is writing tests.
+- A `test` change may touch only the repo's `test_paths`, may not delete files, remove test declarations or add skips.
 - Separate judges: locked test suite, reviewer agent, security scan, charter judge.
 - Sandboxes hold no production secrets and no raw LLM keys (scoped gateway key only).
 - Dependency and web content is untrusted input (prompt injection).
