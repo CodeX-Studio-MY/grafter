@@ -135,9 +135,20 @@ def test_failed_run_exit_1(tmp_path: Path, sandbox_origin: Path) -> None:
     assert "stopped: error: FileNotFoundError" in result.output
 
 
-def test_real_run_needs_app_ids(tmp_path: Path, sandbox_origin: Path) -> None:
+UNSAFE = {"GRAFTER_UNSAFE_ALLOW_LOCAL_REAL_RUN": "1"}
+
+
+def test_real_run_with_local_runner_refused(tmp_path: Path, sandbox_origin: Path) -> None:
     cfg = write_cfg(tmp_path, sandbox_origin)
     result = invoke("run", "--config", str(cfg))
+    assert result.exit_code == 2
+    assert "runner: local is only allowed with --dry-run" in result.output
+    assert not (tmp_path / "home").exists()
+
+
+def test_real_run_needs_app_ids(tmp_path: Path, sandbox_origin: Path) -> None:
+    cfg = write_cfg(tmp_path, sandbox_origin)
+    result = invoke("run", "--config", str(cfg), env=UNSAFE)
     assert result.exit_code == 1
     assert "github_app.app_id and github_app.installation_id are not set" in result.output
 
@@ -145,7 +156,7 @@ def test_real_run_needs_app_ids(tmp_path: Path, sandbox_origin: Path) -> None:
 def test_real_run_needs_private_key(tmp_path: Path, sandbox_origin: Path) -> None:
     ids = {"app_id": APP_ID, "installation_id": INSTALLATION_ID}
     cfg = write_cfg(tmp_path, sandbox_origin, github_app=ids)
-    env = {"GRAFTER_GITHUB_APP_PRIVATE_KEY": "", "GITHUB_APP_PRIVATE_KEY": ""}
+    env = {"GRAFTER_GITHUB_APP_PRIVATE_KEY": "", "GITHUB_APP_PRIVATE_KEY": "", **UNSAFE}
     result = invoke("run", "--config", str(cfg), env=env)
     assert result.exit_code == 1
     assert "secret GITHUB_APP_PRIVATE_KEY is not set" in result.output
@@ -160,7 +171,7 @@ def test_real_run_against_fake_github(
     """Real (non-dry) run wiring: App token, GitHubClient, find_open_pr per task."""
     ids = {"app_id": APP_ID, "installation_id": INSTALLATION_ID, "api_url": fake_github.url}
     cfg = write_cfg(tmp_path, sandbox_origin, github_app=ids)
-    env = {"GRAFTER_GITHUB_APP_PRIVATE_KEY": rsa_keys[0]}
+    env = {"GRAFTER_GITHUB_APP_PRIVATE_KEY": rsa_keys[0], **UNSAFE}
     result = invoke("run", "--config", str(cfg), env=env)
     assert result.exit_code == 0, result.output
     assert result.output.startswith("run ") or "\nrun " in result.output

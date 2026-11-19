@@ -25,6 +25,8 @@ from grafter.runner import LocalRunner
 from grafter.store import Store
 
 MASTER_KEY_ENV = "LITELLM_MASTER_KEY"
+# Test-only escape hatch: lets the offline suite exercise real-run wiring with runner: local.
+ALLOW_LOCAL_REAL_RUN_ENV = "GRAFTER_UNSAFE_ALLOW_LOCAL_REAL_RUN"
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -210,6 +212,12 @@ def run(
     dry = dry_run or cfg.dry_run
     if cfg.runner == "docker":
         raise _fail("docker runner lands in 1D2b; set runner: local only for offline testing", 2)
+    if not dry and os.environ.get(ALLOW_LOCAL_REAL_RUN_ENV) != "1":
+        raise _fail(
+            "runner: local is only allowed with --dry-run: a real run would execute "
+            "agent-written code on this host next to Grafter's secrets (wait for 1D2b)",
+            2,
+        )
     engine = _engine(cfg)
     auth: AppAuth | None = None
     try:
