@@ -1,3 +1,4 @@
+import hashlib
 from typing import Any
 
 import pytest
@@ -5,7 +6,13 @@ import pytest
 from grafter.charter import ChangeType
 from grafter.engines.base import Task
 from grafter.guard import Tier
-from grafter.prbody import FINGERPRINT_MARKER, LABEL_COLORS, PullRequestDraft, render_pr
+from grafter.prbody import (
+    FINGERPRINT_MARKER,
+    LABEL_COLORS,
+    PullRequestDraft,
+    fingerprint_for,
+    render_pr,
+)
 
 FP = "0123456789abcdef"
 TASK = Task(
@@ -133,3 +140,24 @@ def test_unterminated_marker_neutralised() -> None:
 def test_rejects_bad_fingerprint(fp: str) -> None:
     with pytest.raises(ValueError, match="fingerprint"):
         render(fingerprint=fp)
+
+
+def test_fingerprint_for_is_stable_and_scoped() -> None:
+    fp = fingerprint_for(TASK, "src/billing/rounding.py")
+    expected = hashlib.sha256(b"api|test|src/billing/rounding.py").hexdigest()[:16]
+    assert fp == expected
+    assert len(fp) == 16 and int(fp, 16) >= 0
+    assert fingerprint_for(TASK, "src/billing/rounding.py") == fp
+    assert fingerprint_for(TASK, "src/other.py") != fp
+    other_type = Task("t-43", "api", ChangeType.BUGFIX, "c", "i")
+    assert fingerprint_for(other_type, "src/billing/rounding.py") != fp
+    other_repo = Task("t-42", "web", ChangeType.TEST, "c", "i")
+    assert fingerprint_for(other_repo, "src/billing/rounding.py") != fp
+    # The task id is not part of the fingerprint: a rerun gets a new id, same change.
+    rerun = Task("t-99", "api", ChangeType.TEST, "other ref", "other words")
+    assert fingerprint_for(rerun, "src/billing/rounding.py") == fp
+
+
+def test_fingerprint_for_renders() -> None:
+    fp = fingerprint_for(TASK, "x")
+    assert FINGERPRINT_MARKER.format(fp=fp) in render(fingerprint=fp).body

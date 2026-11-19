@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from grafter.github import AppAuth, GitHubClient, GitHubError, scrub
+from grafter.prbody import FINGERPRINT_MARKER
 
 APP_ID = 1234
 INSTALLATION_ID = 5678
@@ -201,6 +202,7 @@ def fake(keypair: tuple[str, str], clock: Clock) -> Iterator[FakeGitHub]:
     f = FakeGitHub(keypair[1], clock)
     yield f
     f.server.shutdown()
+    f.server.server_close()
 
 
 @pytest.fixture
@@ -452,3 +454,55 @@ def test_scrub_and_repr() -> None:
 def test_client_rejects_non_http_url() -> None:
     with pytest.raises(GitHubError, match="http"):
         GitHubClient(StaticToken("t"), api_url="ftp://x")
+
+
+# --- idempotency ---------------------------------------------------------------
+
+FP = "0123456789abcdef"
+MARK = FINGERPRINT_MARKER.format(fp=FP)
+
+
+def test_find_open_pr_none(client: GitHubClient, fake: FakeGitHub) -> None:
+    assert client.find_open_pr(REPO, FP) is None
+
+
+def test_find_open_pr_matches_marker(client: GitHubClient, fake: FakeGitHub) -> None:
+    fake.add_pr(REPO, "ai/other", "body <!-- grafter:fingerprint=ffffffffffffffff -->")
+    fake.add_pr(REPO, "ai/t1", f"text\n{MARK}\nfooter")
+    pr = client.find_open_pr(REPO, FP)
+    assert pr is not None and pr["number"] == 2
+    _, path, query, _ = fake.calls[-1]
+    assert path == f"/repos/{REPO}/pulls"
+    assert query["state"] == ["open"] and query["per_page"] == ["100"]
+
+
+def test_find_open_pr_ignores_non_ai_heads_and_closed(
+    client: GitHubClient, fake: FakeGitHub
+) -> None:
+    fake.add_pr(REPO, "feature/spoof", MARK)
+    fake.add_pr(REPO, "main", MARK)
+    fake.add_pr(REPO, "ai/t1", MARK, state="closed")
+    fake.add_pr(REPO, "ai/t2", None)
+    assert client.find_open_pr(REPO, FP) is None
+
+
+def test_find_open_pr_needs_exact_marker(client: GitHubClient, fake: FakeGitHub) -> None:
+    fake.add_pr(REPO, "ai/t1", f"<!-- grafter:fingerprint={FP}0 -->")
+    fake.add_pr(REPO, "ai/t2", f"grafter:fingerprint={FP}")
+    assert client.find_open_pr(REPO, FP) is None
+
+
+def test_find_open_pr_paginates(client: GitHubClient, fake: FakeGitHub) -> None:
+    for i in range(150):
+        fake.add_pr(REPO, f"ai/t{i}", "no marker")
+    fake.add_pr(REPO, "ai/target", MARK)
+    pr = client.find_open_pr(REPO, FP)
+    assert pr is not None and pr["head"]["ref"] == "ai/target"
+    pages = [c[2]["page"] for c in fake.calls if c[1] == f"/repos/{REPO}/pulls"]
+    assert pages == [["1"], ["2"]]
+
+
+def test_find_open_pr_rejects_bad_fingerprint(client: GitHubClient, fake: FakeGitHub) -> None:
+    with pytest.raises(GitHubError, match="fingerprint"):
+        client.find_open_pr(REPO, "")
+    assert fake.calls == []

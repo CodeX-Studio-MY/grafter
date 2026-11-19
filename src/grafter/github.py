@@ -20,6 +20,8 @@ from typing import Any, Protocol
 
 import jwt as pyjwt
 
+from grafter.prbody import marker
+
 API_URL = "https://api.github.com"
 API_VERSION = "2022-11-28"
 # Refresh the installation token this many seconds before GitHub says it expires.
@@ -238,3 +240,24 @@ class GitHubClient:
         if labels:
             self._request("POST", f"/repos/{repo}/issues/{pr['number']}/labels", {"labels": labels})
         return pr
+
+    def find_open_pr(self, repo: str, fingerprint: str) -> dict[str, Any] | None:
+        """The open PR from an `ai/*` branch whose body carries `fingerprint`'s marker."""
+        path = f"/repos/{_check_repo(repo)}/pulls"
+        try:
+            wanted = marker(fingerprint)
+        except ValueError as e:
+            raise GitHubError(str(e)) from None
+        for pr in self._paginate(path, {"state": "open"}):
+            head = pr.get("head")
+            ref = head.get("ref") if isinstance(head, dict) else None
+            body = pr.get("body")
+            if (
+                pr.get("state") == "open"
+                and isinstance(ref, str)
+                and ref.startswith("ai/")
+                and isinstance(body, str)
+                and wanted in body.splitlines()
+            ):
+                return pr
+        return None

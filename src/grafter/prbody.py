@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass, field
 
@@ -39,6 +40,20 @@ class PullRequestDraft:
     title: str
     body: str
     labels: list[str] = field(default_factory=list)
+
+
+def fingerprint_for(task: Task, target: str) -> str:
+    """Stable id of a change: same repo, change type and target -> same fingerprint,
+    whatever the task id or wording, so reruns find the PR already open."""
+    key = f"{task.repo}|{task.change_type.value}|{target}"
+    return hashlib.sha256(key.encode()).hexdigest()[:16]
+
+
+def marker(fingerprint: str) -> str:
+    """The exact marker line for `fingerprint`; ValueError if it could break out of it."""
+    if not _FP_RE.fullmatch(fingerprint):
+        raise ValueError(f"invalid fingerprint: {fingerprint!r}")
+    return FINGERPRINT_MARKER.format(fp=fingerprint)
 
 
 def _clean(text: str) -> str:
@@ -79,8 +94,7 @@ def render_pr(
     cost_usd: float,
     fingerprint: str,
 ) -> PullRequestDraft:
-    if not _FP_RE.fullmatch(fingerprint):
-        raise ValueError(f"invalid fingerprint: {fingerprint!r}")
+    footer_marker = marker(fingerprint)
     summary = _clean(summary).strip()
     instruction = _clean(task.instruction).strip()
     risk_lines = [f"- {r}" for r in (_clean(r).strip() for r in risks) if r]
@@ -107,7 +121,7 @@ def render_pr(
             f"Tokens: {tokens:,} · Cost: ${cost_usd:.2f}",
             "",
             "---",
-            FINGERPRINT_MARKER.format(fp=fingerprint),
+            footer_marker,
             FOOTER,
             "",
         ]
