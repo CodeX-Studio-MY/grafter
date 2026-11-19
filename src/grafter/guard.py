@@ -8,6 +8,7 @@ from enum import IntEnum
 from grafter.charter import ChangeType, Charter
 from grafter.config import Limits
 from grafter.engines.base import RunResult, Task
+from grafter.secret_scan import scan_diff
 
 
 class Tier(IntEnum):
@@ -42,6 +43,9 @@ def check(task: Task, result: RunResult, charter: Charter, limits: Limits | None
     lines = result.lines_added + result.lines_removed
     if lines > limits.max_lines_per_change:
         reasons.append(f"diff too large: {lines} > {limits.max_lines_per_change} lines")
+
+    for finding in scan_diff(result.diff):
+        reasons.append(f"secret detected: {finding.rule} (line {finding.line_no})")
 
     if reasons:
         return Verdict(allowed=False, reasons=reasons)

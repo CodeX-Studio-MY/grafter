@@ -7,6 +7,7 @@ from grafter.charter import ChangeType, Charter, load_charter
 from grafter.config import Limits
 from grafter.engines.base import RunResult, Task
 from grafter.guard import Tier, check
+from grafter.secret_scan import scan_diff
 
 ROOT = Path(__file__).parent.parent
 EXAMPLE = ROOT / "examples/acme-harvest/grafter.charter.yaml"
@@ -136,3 +137,72 @@ def test_deleted_files_count_against_tier0(charter):
     r = RunResult(success=True, changed_files=["a.csproj"], deleted_files=["b", "c"])
     v = check(task(ChangeType.DEPENDENCY, bump="patch"), r, charter)
     assert v.allowed and v.tier == Tier.APPROVE
+
+
+# Fake secrets are assembled at runtime so no key-shaped literal is committed.
+FAKE = {
+    "aws": "AK" + "IA" + "Q7" * 8,
+    "github": "gh" + "p_" + "a1B2" * 9,
+    "github_pat": "github" + "_pat_" + "x9Y8_" * 5,
+    "private_key": "-----BEGIN RSA " + "PRIVATE KEY-----",
+    "slack": "xo" + "xb-" + "1234-abcd-5678",
+    "sk": "s" + "k-ant-" + "Zz9_" * 6,
+    "google": "AI" + "za" + "Q" * 35,
+    "generic": "api_key = " + '"' + "s3cr3tV4lu3!" + "x" * 4 + '"',
+}
+
+
+def diff_with(*added: str, removed: str = "") -> str:
+    lines = ["diff --git a/x b/x", "--- a/x", "+++ b/x", "@@ -1,1 +1,2 @@", " ctx"]
+    if removed:
+        lines.append("-" + removed)
+    lines += ["+" + a for a in added]
+    return "\n".join(lines)
+
+
+@pytest.mark.parametrize("rule", sorted(FAKE))
+def test_scan_detects_each_rule(rule):
+    findings = scan_diff(diff_with("x = " + FAKE[rule]))
+    assert [f.rule for f in findings] == [rule]
+    assert findings[0].line_no == 6
+
+
+def test_generic_rule_is_case_insensitive():
+    secret = "PassWord: " + "'" + "hunter2hunter2" + "'"
+    assert [f.rule for f in scan_diff(diff_with(secret))] == ["generic"]
+
+
+def test_scan_ignores_removed_and_context_lines():
+    d = diff_with("clean = 1", removed=FAKE["aws"]).replace(" ctx", " " + FAKE["github"])
+    assert scan_diff(d) == []
+
+
+def test_scan_ignores_file_header():
+    assert scan_diff("+++ b/" + FAKE["aws"]) == []
+
+
+def test_clean_diff_passes():
+    assert scan_diff(diff_with("def f():", "    return 1")) == []
+
+
+def test_redaction_never_leaks_value():
+    for secret in FAKE.values():
+        (f,) = scan_diff(diff_with(secret))
+        assert f.redacted.endswith("***")
+        assert len(f.redacted) == 7
+        assert secret not in f.redacted and secret not in repr(f)
+        assert secret[4:12] not in repr(f)
+
+
+def test_guard_rejects_secret(charter):
+    secret = FAKE["aws"]
+    r = RunResult(success=True, changed_files=["a.py"], diff=diff_with("k = 1", secret))
+    v = check(task(), r, charter)
+    assert not v.allowed
+    assert "secret detected: aws (line 7)" in v.reasons
+    assert all(secret not in x for x in v.reasons)
+
+
+def test_guard_allows_clean_diff(charter):
+    r = RunResult(success=True, changed_files=["a.py"], diff=diff_with("x = 1"))
+    assert check(task(), r, charter).allowed
