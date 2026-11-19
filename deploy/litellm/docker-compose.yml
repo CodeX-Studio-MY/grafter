@@ -1,0 +1,45 @@
+# LiteLLM gateway for Grafter (D15, D16, D18).
+# The Postgres here is LiteLLM's own spend/key store, private to this stack.
+# Grafter's state is a separate SQLite file (D17).
+name: grafter-gateway
+
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm:v1.108.1
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://litellm:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/litellm
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    ports:
+      - "127.0.0.1:4000:4000"   # host only; never exposed beyond the VM
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [gateway, grafter-gw]
+    restart: unless-stopped
+
+  db:
+    image: postgres:16.15-alpine
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_DB: litellm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - litellm-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [gateway]        # no published port; only LiteLLM can reach it
+    restart: unless-stopped
+
+networks:
+  gateway: {}
+  grafter-gw:                  # sandboxes join this network to reach the gateway (1C1)
+    name: grafter-gw
+
+volumes:
+  litellm-db: {}
