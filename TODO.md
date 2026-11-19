@@ -76,7 +76,9 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [ ] **1B5** `grafter doctor`: checks Docker, gateway, App permissions, rulesets present, kill switch state. Done when: all green on the VM.
 
 ### 1C Sandbox + engine
-- [ ] **1C1** Sandbox image for the sandbox repo (`sandboxes/`, base `python:3.12-slim`); network limited to the LiteLLM gateway; no host secrets mounted. Done when: container runs the repo's tests.
+- [ ] **1C1** Sandbox image for the sandbox repo, split:
+  - [x] **1C1a** `sandboxes/python/Dockerfile` (`python:3.12.15-slim-bookworm`, non-root, no secrets) + `scripts/build-sandbox.sh`. Done when: files reviewed, script syntax-checked.
+  - [ ] **1C1b** 🧑 Build it and run the sandbox repo's tests inside it (`--network none`, or `grafter-gw` only). Done when: container runs the repo's tests. Needs a running Docker engine.
 - [ ] **1C2** Spike: OpenHands Software Agent SDK + DockerWorkspace hello-world (MIT packages only; verify licence; update `THIRD_PARTY.md`). Done when: agent edits a file inside the container.
 - [ ] **1C3** `OpenHandsEngine.run`: two steps (D15): `models.planner` writes a plan from task + charter + `AGENTS.md` + rules, then `models.coder` executes it; returns `RunResult` (changed files, summary, risks, tokens); token budget enforced. Done when: test with fake LLM + one real run on the sandbox repo.
 - [ ] **1C4** Fake engine for tests (deterministic diff). Done when: full pipeline test runs offline in CI.
@@ -86,16 +88,22 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [ ] **1D2** Verification gates after the engine: full suite passes in a fresh container; overall coverage did not drop and the target file improved; `guard.check` passes. Failures are recorded as rejected with a reason, no PR. Done when: tests.
 - [ ] **1D3** `grafter run`: lock → kill switch → find → engine → gates → guard → branch/commit/push/PR → record; stop at `max_prs_per_night` or budget. `--dry-run` skips push/PR. Done when: dry-run, then a real run on the sandbox repo opens ≤ N PRs.
 - [ ] **1D4** Nightly run report (PRs opened, rejections + reasons, tokens, cost) as a markdown file and an issue comment. Done when: report exists after a run.
-- [ ] **1D5** Cron / systemd timer setup in `deploy/`. Done when: one unattended night on the sandbox repo.
+- [ ] **1D5** Nightly schedule, split:
+  - [x] **1D5a** `deploy/systemd/grafter.{service,timer}` (02:00, hardened, secrets via 0600 env file) + `deploy/cron/grafter.cron`. Done when: files reviewed.
+  - [ ] **1D5b** 🧑 Enable the timer on the VM. Done when: one unattended night on the sandbox repo.
 
 ### 1E Scanners
-- [ ] **1E1** Renovate config template (patch bumps grouped, `ai/deps-*` branches). Done when: a Renovate PR on the sandbox repo.
+- [ ] **1E1** Renovate config template, split:
+  - [x] **1E1a** `deploy/renovate/renovate.json` (`ai/deps-*` branches, patch bumps grouped, no automerge). Done when: valid JSON, reviewed.
+  - [ ] **1E1b** 🧑 Enable Renovate on the sandbox repo. Done when: a Renovate PR on the sandbox repo.
 - [ ] **1E2** Semgrep + Trivy + OSV-Scanner in the sandbox; findings stored as candidate tasks (not acted on in phase 1). Done when: `grafter findings` lists them.
 
 ### 1F Go live on the pilot
 - [ ] **1F1** 🧑 Install on pilot repos with `max_prs_per_night: 1`; dry-run 3 nights; review logs.
 - [ ] **1F2** 🧑 Real runs; review PRs each morning; record approve/reject + reason.
-- [ ] **1F3** `docs/operations.md`: install, config, doctor, kill switch, rollback. Done when: the user can follow it on a fresh VM.
+- [ ] **1F3** `docs/operations.md`, split:
+  - [x] **1F3a** Draft: host, install, config + secrets, gateway, sandbox image, database, schedule, kill switch, rollback, upgrade. Done when: draft merged.
+  - [ ] **1F3b** 🧑 Follow it on a fresh VM and fix every gap. Done when: the user can follow it on a fresh VM.
 
 **Gate 1 → 2:** coverage target met per repo (0C3) · approval rate ≥ threshold · zero guard escapes.
 
