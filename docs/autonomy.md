@@ -2,7 +2,7 @@
 
 | Tier | Examples | Path |
 |---|---|---|
-| 0 Auto | Patch-level dependency bump, official CVE patch | Auto-merge if all gates pass (opt-in) |
+| 0 Auto | Patch-level dependency bump (incl. an upstream CVE fix shipped as a patch release), ≤ 2 files | Auto-merge if all gates pass (opt-in). Agent-written security code is never Tier 0 |
 | 1 Approve | Minor bumps, bug fixes, refactors, tests | One-click human approval |
 | 2 Review | `review_paths` (migrations), auth/security logic, cross-repo groups | Full human review |
 | Never | Charter, own permissions, guardrails, audit log, `protected_paths` | Locked |
