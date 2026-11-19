@@ -26,6 +26,7 @@ schedule → find work → write fix (sandbox) → tests + reviewer + charter ju
 
 ## Docs
 
+- [TODO / project status](TODO.md)
 - [Overview](docs/overview.md)
 - [Decisions](docs/decisions.md)
 - [Solution Charter](docs/charter.md)
