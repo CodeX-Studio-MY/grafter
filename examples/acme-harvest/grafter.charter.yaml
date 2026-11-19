@@ -1,0 +1,16 @@
+# Fictional example. Not a real product.
+solution: AcmeHarvest
+purpose: Postharvest management for fresh-produce growers, packers and traders
+core_domains: [harvest intake, grading, packing, cold chain, traceability, orders, invoicing]
+users: [farm managers, packhouse staff, warehouse, sales, management]
+non_goals:
+  - accounting / general ledger (export only)
+  - unrelated domains (HR, library, LMS)
+invariants:
+  - traceability chain must never break
+  - invoice numbers are immutable once issued
+  - no breaking API change without a version bump
+protected_paths: [auth/, .github/, grafter.charter.yaml]
+review_paths: [db/migrations/]
+allowed_change_types: [bugfix, security, performance, test, refactor, docs, dependency]
+feature_changes: propose_only

@@ -1,0 +1,13 @@
+repos:
+  - your-org/your-api
+  - your-org/your-web
+branches:
+  production: main
+  preview: ai/preview
+  fix_prefix: ai/
+limits:
+  max_prs_per_night: 3
+  token_budget_per_night: 500000
+engine: openhands
+tier0_auto_merge: false   # opt-in
+llm_gateway_url: http://localhost:4000

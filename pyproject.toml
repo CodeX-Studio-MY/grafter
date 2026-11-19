@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "grafter"
+version = "0.0.1"
+description = "Continuous AI that grafts only what you approve."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+authors = [{ name = "CodeX Studio" }]
+dependencies = [
+  "pydantic>=2.7",
+  "pyyaml>=6.0",
+  "typer>=0.12",
+]
+
+[project.optional-dependencies]
+openhands = ["openhands-sdk"]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+grafter = "grafter.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/grafter"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
