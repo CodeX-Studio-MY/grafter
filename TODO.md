@@ -70,9 +70,15 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 
 ### 1B Git + GitHub
 - [x] **1B1** Git wrapper: clone/fetch into work dir, cut `ai/<id>` from fresh `main`, commit as Grafter, push. Hard check: never pushes a non-`ai/*` ref. Done when: integration test against a local bare repo.
-- [ ] **1B2** GitHub App auth (JWT → installation token, auto refresh). Done when: `grafter doctor` lists repos it can see.
-- [ ] **1B3** PR creation: title, body (charter citation, change type, tier, tests run + results, coverage delta, risks, tokens), labels (`grafter`, `tier-N`, `type-X`). Done when: PR opened on the sandbox repo.
-- [ ] **1B4** Idempotency: skip a task if an open PR with the same fingerprint exists. Done when: second run opens nothing new.
+- [ ] **1B2** GitHub App auth, split:
+  - [x] **1B2a** `github.AppAuth`: RS256 JWT, installation token cached until 5 min before expiry. Done when: tests against a fake GitHub API verifying the JWT.
+  - [ ] **1B2b** 🧑 With the real App (0D2). Done when: `grafter doctor` lists repos it can see.
+- [ ] **1B3** PR creation, split:
+  - [x] **1B3a** `GitHubClient.create_pr` (head must be `ai/*`), `ensure_labels`, `prbody.render_pr` (charter citation, type, tier, tests, coverage delta, risks, tokens, cost, fingerprint marker). Done when: tests against a fake GitHub API.
+  - [ ] **1B3b** 🧑 Done when: a PR opened on the sandbox repo.
+- [ ] **1B4** Idempotency, split:
+  - [x] **1B4a** `find_open_pr(repo, fingerprint)` matches the exact marker on open `ai/*` PRs; fingerprint = sha256(repo|type|target). Done when: tests against a fake GitHub API.
+  - [ ] **1B4b** 🧑 Done when: a second real run on the sandbox repo opens nothing new.
 - [ ] **1B5** `grafter doctor`: checks Docker, gateway, App permissions, rulesets present, kill switch state. Done when: all green on the VM.
 
 ### 1C Sandbox + engine
