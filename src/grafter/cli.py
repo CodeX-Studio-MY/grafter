@@ -14,6 +14,7 @@ from grafter import __version__
 from grafter.charter import load_charter
 from grafter.config import load_config
 from grafter.gateway import GatewayClient, GatewayError, redact
+from grafter.store import Store
 
 MASTER_KEY_ENV = "LITELLM_MASTER_KEY"
 
@@ -99,6 +100,55 @@ def gateway_check(
         typer.secho(f"gateway check failed: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from e
     typer.secho(f"ok: {model} replied {reply.strip()[:40]!r}; key deleted", fg=typer.colors.GREEN)
+
+
+db_app = typer.Typer(no_args_is_help=True, help="State database (SQLite) commands.")
+app.add_typer(db_app, name="db")
+
+DEFAULT_HOME = "~/.grafter"
+DbOption = Annotated[
+    Path | None, typer.Option("--db", help="Database file (default: <home>/grafter.db).")
+]
+
+
+def _db_path(config: Path, db: Path | None) -> Path:
+    try:
+        cfg = load_config(config)
+    except (ValidationError, ValueError, FileNotFoundError) as e:
+        typer.secho(f"invalid config: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from e
+    if db is not None:
+        return db
+    home = str(getattr(cfg, "home", None) or DEFAULT_HOME)
+    return Path(os.path.expandvars(home)).expanduser() / "grafter.db"
+
+
+@db_app.command("migrate")
+def db_migrate(
+    config: Annotated[Path, typer.Option("--config", help="grafter.yaml")] = Path("grafter.yaml"),
+    db: DbOption = None,
+) -> None:
+    """Create or upgrade the state database to the latest schema."""
+    path = _db_path(config, db)
+    with Store(path) as store:
+        version = store.migrate()
+    typer.secho(f"ok: {path} at schema version {version}", fg=typer.colors.GREEN)
+
+
+@db_app.command("backup")
+def db_backup(
+    dest: Annotated[Path, typer.Argument(help="Backup file to write.")],
+    config: Annotated[Path, typer.Option("--config", help="grafter.yaml")] = Path("grafter.yaml"),
+    db: DbOption = None,
+) -> None:
+    """Write a consistent copy of the state database (safe while Grafter runs)."""
+    path = _db_path(config, db)
+    if not path.is_file():
+        typer.secho(f"no database at {path}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    with Store(path) as store:
+        out = store.backup(dest)
+    typer.secho(f"ok: backup written to {out}", fg=typer.colors.GREEN)
 
 
 @app.command()

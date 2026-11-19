@@ -1,0 +1,11 @@
+# Starts grafter.service every night (TODO 1D5).
+[Unit]
+Description=Grafter nightly timer
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

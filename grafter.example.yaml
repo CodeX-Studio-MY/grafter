@@ -1,3 +1,4 @@
+# home: ~/.grafter        # local state: runs/, grafter.lock, grafter.db, work/ (~ and $VARS ok)
 repos:                    # one entry per repo of the solution (fictional example)
   - name: api             # short id: lowercase, digits, - and _; used by the charter's `repos:`
     github: your-org/your-api
