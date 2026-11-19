@@ -25,8 +25,8 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [x] **0A2** Pre-commit hooks (ruff, ruff-format, trailing whitespace) + `ruff format --check` in CI. Done when: CI runs format check.
 - [x] **0A3** mypy (strict on `src/`) in dev deps + CI. Done when: `mypy src` clean.
 - [x] **0A4** pytest-cov in CI, fail under current coverage. Done when: coverage % shown in CI log.
-- [ ] **0A5** PR template (summary, TODO id, verification output) + `CODEOWNERS`. Done when: a new PR shows the template.
-- [ ] **0A6** 🧑 Ruleset on Grafter's own `main`: PR + `test` check required, no force push.
+- [x] **0A5** PR template (summary, TODO id, verification output) + `CODEOWNERS`. Done when: a new PR shows the template.
+- [x] **0A6** 🧑 Ruleset on Grafter's own `main`: PR + `test` check required, no force push.
 
 ### 0B Harden the scaffold (from review of the scaffold)
 - [x] **0B1** Normalise paths in `charter._matches` (`./`, `\`, `..`, case), reject paths escaping the repo, add glob support. Done when: bypass tests pass.
@@ -36,20 +36,20 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [x] **0B5** Guard: a `test` change may touch only test paths (per-repo `test_paths` globs) and may not delete test files or test functions. Done when: tests.
 - [x] **0B6** Guard: secret scan of the diff (regex set or `detect-secrets`) → reject. Done when: test with a fake key.
 - [x] **0B7** Per-repo config: `name`, `default_branch`, `language`, `test_command`, `coverage_command`, `test_paths`, `sandbox_image`. Charter paths become repo-scoped. Update example + add `grafter validate --config`. Done when: example validates.
-- [x] **0B8** Config: `kill_switch` (file/env), `dry_run`, `nightly_focus` rotation, `model`, GitHub App ids (ids only; secrets via env). Done when: tests.
+- [x] **0B8** Config: `kill_switch` (file/env), `dry_run`, `nightly_focus` rotation, models per role (see D15), GitHub App ids (ids only; secrets via env). Done when: tests.
 
 ### 0C Pilot preparation (outside this repo)
 - [ ] **0C1** 🧑 Write the pilot's `grafter.charter.yaml` + `AGENTS.md` in the PILOT repos (Claude can draft it in a pilot-repo session). Done when: `grafter validate` passes on it.
 - [ ] **0C2** 🧑 Measure test coverage per pilot repo (backend, web, mobile). Keep numbers in a private note, NOT in this repo.
-- [ ] **0C3** ⚖️ Set gate thresholds in `docs/decisions.md`: coverage target per repo, min approval rate, max reject streak before throttling.
-- [ ] **0C4** ⚖️ Choose LLM provider/model + nightly budget; record as a decision.
-- [ ] **0C5** ⚖️ Choose phase-1 state store: SQLite (simple, one host) or PostgreSQL (as in docs); record as a decision.
+- [x] **0C3** ⚖️ Set gate thresholds in `docs/decisions.md`: coverage target per repo, min approval rate, max reject streak before throttling. → D14.
+- [x] **0C4** ⚖️ Choose LLM provider/model + nightly budget; record as a decision. → D15 (Opus 5.5 plans/reviews/judges, Sonnet 5.5 codes; `models:` config), D16 ($5/night).
+- [x] **0C5** ⚖️ Choose phase-1 state store: SQLite (simple, one host) or PostgreSQL (as in docs); record as a decision. → D17 (SQLite; PostgreSQL parked for the enterprise evaluation).
 
 ### 0D Infrastructure
-- [ ] **0D1** 🧑 Provision Linux VM (Ubuntu LTS): rootless Docker, Python 3.12, git, non-root `grafter` user.
+- [ ] **0D1** 🧑 Provision Linux VM (Ubuntu LTS): rootless Docker, Python 3.12, git, non-root `grafter` user; nightly backup of the SQLite file (D17).
 - [ ] **0D2** 🧑 Create GitHub App: contents RW, pull requests RW, issues RW, checks R, metadata R. Install on pilot + sandbox repos only. Private key on the VM (mode 0600), never in git.
 - [ ] **0D3** 🧑 Ruleset on each pilot repo `main`: PR + 1 human approval + `test` check, no force push, App not in bypass list. App may push only to `ai/*`.
-- [ ] **0D4** LiteLLM gateway on the VM (docker compose in `deploy/`), per-run virtual key with budget. Done when: a request through the gateway returns a completion.
+- [ ] **0D4** LiteLLM gateway on the VM (docker compose in `deploy/`), per-run virtual key with `max_budget` = `limits.usd_budget_per_night` (D16); Anthropic routes for `models.*` (D15). Done when: a request through the gateway returns a completion.
 - [ ] **0D5** Fictional end-to-end test repo `grafter-sandbox` (tiny app in the style of `examples/acme-harvest`, weak tests). All phase-1 testing happens here before the pilot. Done when: repo exists, App installed, ruleset on.
 
 **Gate 0 → 1:** charter validated · coverage known · thresholds recorded · VM + App + rulesets live.
@@ -61,7 +61,7 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 ### 1A Core plumbing
 - [ ] **1A1** Structured logging (JSON lines) + run id; logs in `~/.grafter/runs/<run-id>/`. Done when: `grafter run --dry-run` writes a log.
 - [ ] **1A2** Run lock so two cron runs never overlap; kill switch checked at start and between tasks. Done when: tests.
-- [ ] **1A3** State store (per 0C5): `runs`, `changes`, `change_events` tables + migrations. Done when: tests on a temp DB.
+- [ ] **1A3** SQLite state store (D17): `runs`, `changes`, `change_deps`, `change_events` tables + numbered migrations; WAL mode + busy timeout; path from config (default `~/.grafter/grafter.db`); `grafter db backup`. Done when: tests on a temp-file DB, incl. migrate-from-empty and a concurrent reader during a write.
 - [ ] **1A4** Secrets from env/file (App key, gateway key); refuse to start if a secret file sits inside a repo dir. Done when: test.
 
 ### 1B Git + GitHub
@@ -74,7 +74,7 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 ### 1C Sandbox + engine
 - [ ] **1C1** Sandbox image for the sandbox repo (`sandboxes/`); network limited to the LiteLLM gateway; no host secrets mounted. Done when: container runs the repo's tests.
 - [ ] **1C2** Spike: OpenHands Software Agent SDK + DockerWorkspace hello-world (MIT packages only; verify licence; update `THIRD_PARTY.md`). Done when: agent edits a file inside the container.
-- [ ] **1C3** `OpenHandsEngine.run`: prompt = task + charter + `AGENTS.md` + rules; returns `RunResult` (changed files, summary, risks, tokens); token budget enforced. Done when: test with fake LLM + one real run on the sandbox repo.
+- [ ] **1C3** `OpenHandsEngine.run`: two steps (D15): `models.planner` writes a plan from task + charter + `AGENTS.md` + rules, then `models.coder` executes it; returns `RunResult` (changed files, summary, risks, tokens); token budget enforced. Done when: test with fake LLM + one real run on the sandbox repo.
 - [ ] **1C4** Fake engine for tests (deterministic diff). Done when: full pipeline test runs offline in CI.
 
 ### 1D Work finding + pipeline
@@ -105,7 +105,7 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [ ] **2.5** Reject flow (delete branch, record reason) and rework flow (review comment → agent → same branch).
 - [ ] **2.6** `ai/preview` rebuild = `main` + pending branches; conflicts mark the later change `blocked`.
 - [ ] **2.7** `depends_on` + cross-repo change groups (merge order backend → web → mobile).
-- [ ] **2.8** Separate reviewer agent + charter judge (different prompt/model from the writer); judge rejections logged.
+- [ ] **2.8** Separate reviewer agent + charter judge on `models.reviewer` / `models.judge` (Opus 5.5, never the coder's prompt); judge rejections logged.
 - [ ] **2.9** Drift signals: new modules, dependencies, domain vocabulary flagged in the PR.
 - [ ] **2.10** Learning loop: approval rate per category; rejection comments into agent memory; throttle low-acceptance categories.
 - [ ] **2.11** Features as issues: feature ideas filed as issues, never code.
@@ -128,3 +128,4 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [ ] **4.2** Next.js dashboard.
 - [ ] **4.3** Onboard a second solution.
 - [ ] **4.4** More engine adapters (OpenCode, Claude Code, Codex CLI).
+- [ ] **4.5** ⚖️ Enterprise evaluation (D2): includes whether PostgreSQL is needed (D17).

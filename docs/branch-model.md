@@ -46,9 +46,11 @@ pending_review → rejected
 Git is the source of truth for code; the database for status. Webhooks reconcile direct pushes and merges.
 
 ```sql
+-- SQLite (D17); portable SQL types only. JSON columns hold JSON text.
 changes(id, repo, branch, base_sha, head_sha, status, risk_tier, category,
-        charter_ref, summary, risks jsonb, test_results jsonb,
-        depends_on uuid[], group_id, decided_by, decided_at, merged_sha)
+        charter_ref, summary, risks json, test_results json,
+        group_id, decided_by, decided_at, merged_sha)
+change_deps(change_id, depends_on)
 change_events(change_id, from_status, to_status, actor, note, at)
 review_feedback(change_id, author, comment, at)
 ```
