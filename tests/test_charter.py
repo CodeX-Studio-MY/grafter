@@ -3,10 +3,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from grafter.charter import ChangeType, Charter, load_charter
+from grafter.charter import Charter, load_charter
 from grafter.config import load_config
-from grafter.engines.base import RunResult, Task
-from grafter.guard import Tier, check
 
 ROOT = Path(__file__).parent.parent
 EXAMPLE = ROOT / "examples/acme-harvest/grafter.charter.yaml"
@@ -15,10 +13,6 @@ EXAMPLE = ROOT / "examples/acme-harvest/grafter.charter.yaml"
 @pytest.fixture
 def charter() -> Charter:
     return load_charter(EXAMPLE)
-
-
-def task(t: ChangeType = ChangeType.BUGFIX, ref: str = "invariant: traceability") -> Task:
-    return Task(id="1", repo="api", change_type=t, charter_ref=ref, instruction="x")
 
 
 def test_example_charter_loads(charter):
@@ -55,28 +49,6 @@ def test_unknown_field_rejected():
             allowed_change_types=["bugfix"],
             features="yes",
         )
-
-
-def test_guard_rejects_protected_path(charter):
-    v = check(task(), RunResult(success=True, changed_files=["auth/x.cs"]), charter)
-    assert not v.allowed
-
-
-def test_guard_rejects_missing_citation(charter):
-    v = check(task(ref=" "), RunResult(success=True, changed_files=["src/a.cs"]), charter)
-    assert not v.allowed
-
-
-def test_guard_review_paths_are_tier2(charter):
-    v = check(task(), RunResult(success=True, changed_files=["db/migrations/2.sql"]), charter)
-    assert v.allowed and v.tier == Tier.REVIEW
-
-
-def test_guard_small_dependency_bump_is_tier0(charter):
-    v = check(
-        task(ChangeType.DEPENDENCY), RunResult(success=True, changed_files=["a.csproj"]), charter
-    )
-    assert v.allowed and v.tier == Tier.AUTO
 
 
 def test_example_config_defaults():

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 from grafter.charter import ChangeType, Charter
 
@@ -16,6 +16,7 @@ class Task:
     change_type: ChangeType
     charter_ref: str
     instruction: str
+    version_bump: Literal["patch", "minor", "major"] | None = None
 
 
 @dataclass
