@@ -69,7 +69,7 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [x] **1A4** Secrets from env/file (App key, gateway key); refuse to start if a secret file sits inside a repo dir. Done when: test.
 
 ### 1B Git + GitHub
-- [ ] **1B1** Git wrapper: clone/fetch into work dir, cut `ai/<id>` from fresh `main`, commit as Grafter, push. Hard check: never pushes a non-`ai/*` ref. Done when: integration test against a local bare repo.
+- [x] **1B1** Git wrapper: clone/fetch into work dir, cut `ai/<id>` from fresh `main`, commit as Grafter, push. Hard check: never pushes a non-`ai/*` ref. Done when: integration test against a local bare repo.
 - [ ] **1B2** GitHub App auth (JWT → installation token, auto refresh). Done when: `grafter doctor` lists repos it can see.
 - [ ] **1B3** PR creation: title, body (charter citation, change type, tier, tests run + results, coverage delta, risks, tokens), labels (`grafter`, `tier-N`, `type-X`). Done when: PR opened on the sandbox repo.
 - [ ] **1B4** Idempotency: skip a task if an open PR with the same fingerprint exists. Done when: second run opens nothing new.
