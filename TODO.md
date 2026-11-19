@@ -23,8 +23,8 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 ### 0A Repo hygiene
 - [x] **0A1** Add `TODO.md`, link from `CLAUDE.md` and `README.md`. Done when: PR merged.
 - [x] **0A2** Pre-commit hooks (ruff, ruff-format, trailing whitespace) + `ruff format --check` in CI. Done when: CI runs format check.
-- [ ] **0A3** mypy (strict on `src/`) in dev deps + CI. Done when: `mypy src` clean.
-- [ ] **0A4** pytest-cov in CI, fail under current coverage. Done when: coverage % shown in CI log.
+- [x] **0A3** mypy (strict on `src/`) in dev deps + CI. Done when: `mypy src` clean.
+- [x] **0A4** pytest-cov in CI, fail under current coverage. Done when: coverage % shown in CI log.
 - [ ] **0A5** PR template (summary, TODO id, verification output) + `CODEOWNERS`. Done when: a new PR shows the template.
 - [ ] **0A6** 🧑 Ruleset on Grafter's own `main`: PR + `test` check required, no force push.
 
