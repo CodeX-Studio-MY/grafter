@@ -26,9 +26,9 @@ Scheduler ─► Orchestrator ─► Agent workers ──► LLM gateway (LiteLL
 | Scheduler | cron | same |
 | Orchestrator | Python script | Python FastAPI (+ Temporal if needed) |
 | Agent workers | Python + OpenHands SDK in Docker | same |
-| LLM access | LiteLLM gateway, scoped key per sandbox | same |
+| LLM access | LiteLLM gateway, scoped key per sandbox, $5/night cap; planner/reviewer/judge = Opus 5.5, coder = Sonnet 5.5 (configurable) | same |
 | Review UI | GitHub PRs | Next.js dashboard |
-| State | PostgreSQL | same |
+| State | PostgreSQL (container on the VM, from phase 1) | same |
 | Git | GitHub App | same |
 | Scanners | Renovate, Semgrep, Trivy, OSV-Scanner | same |
 | Sandbox | Rootless Docker | gVisor option |
