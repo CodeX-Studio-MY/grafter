@@ -43,10 +43,10 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [ ] **0C2** 🧑 Measure test coverage per pilot repo (backend, web, mobile). Keep numbers in a private note, NOT in this repo.
 - [x] **0C3** ⚖️ Set gate thresholds in `docs/decisions.md`: coverage target per repo, min approval rate, max reject streak before throttling. → D14.
 - [x] **0C4** ⚖️ Choose LLM provider/model + nightly budget; record as a decision. → D15 (Opus 5.5 plans/reviews/judges, Sonnet 5.5 codes; `models:` config), D16 ($5/night).
-- [x] **0C5** ⚖️ Choose phase-1 state store: SQLite (simple, one host) or PostgreSQL (as in docs); record as a decision. → D17 (PostgreSQL from phase 1).
+- [x] **0C5** ⚖️ Choose phase-1 state store: SQLite (simple, one host) or PostgreSQL (as in docs); record as a decision. → D17 (SQLite; PostgreSQL parked for the enterprise evaluation).
 
 ### 0D Infrastructure
-- [ ] **0D1** 🧑 Provision Linux VM (Ubuntu LTS): rootless Docker, Python 3.12, git, non-root `grafter` user, PostgreSQL container (D17) with a nightly `pg_dump`.
+- [ ] **0D1** 🧑 Provision Linux VM (Ubuntu LTS): rootless Docker, Python 3.12, git, non-root `grafter` user; nightly backup of the SQLite file (D17).
 - [ ] **0D2** 🧑 Create GitHub App: contents RW, pull requests RW, issues RW, checks R, metadata R. Install on pilot + sandbox repos only. Private key on the VM (mode 0600), never in git.
 - [ ] **0D3** 🧑 Ruleset on each pilot repo `main`: PR + 1 human approval + `test` check, no force push, App not in bypass list. App may push only to `ai/*`.
 - [ ] **0D4** LiteLLM gateway on the VM (docker compose in `deploy/`), per-run virtual key with `max_budget` = `limits.usd_budget_per_night` (D16); Anthropic routes for `models.*` (D15). Done when: a request through the gateway returns a completion.
@@ -61,7 +61,7 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 ### 1A Core plumbing
 - [ ] **1A1** Structured logging (JSON lines) + run id; logs in `~/.grafter/runs/<run-id>/`. Done when: `grafter run --dry-run` writes a log.
 - [ ] **1A2** Run lock so two cron runs never overlap; kill switch checked at start and between tasks. Done when: tests.
-- [ ] **1A3** PostgreSQL state store (D17): `runs`, `changes`, `change_events` tables + migrations; URL from `GRAFTER_DATABASE_URL`. Done when: tests against a throwaway Postgres container.
+- [ ] **1A3** SQLite state store (D17): `runs`, `changes`, `change_deps`, `change_events` tables + numbered migrations; WAL mode + busy timeout; path from config (default `~/.grafter/grafter.db`); `grafter db backup`. Done when: tests on a temp-file DB, incl. migrate-from-empty and a concurrent reader during a write.
 - [ ] **1A4** Secrets from env/file (App key, gateway key); refuse to start if a secret file sits inside a repo dir. Done when: test.
 
 ### 1B Git + GitHub
@@ -128,3 +128,4 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [ ] **4.2** Next.js dashboard.
 - [ ] **4.3** Onboard a second solution.
 - [ ] **4.4** More engine adapters (OpenCode, Claude Code, Codex CLI).
+- [ ] **4.5** ⚖️ Enterprise evaluation (D2): includes whether PostgreSQL is needed (D17).
