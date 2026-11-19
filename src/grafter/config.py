@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -116,6 +117,7 @@ class RepoConfig(BaseModel):
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    home: str = Field(default="~/.grafter", min_length=1)  # runs, lock, db, work; ~ and $VARS ok
     repos: list[RepoConfig] = Field(min_length=1)
     branches: Branches = Branches()
     limits: Limits = Limits()
@@ -156,6 +158,31 @@ class Config(BaseModel):
 
     def focus_for(self, day: date) -> ChangeType:
         return self.nightly_focus[day.toordinal() % len(self.nightly_focus)]
+
+    def paths(self) -> Paths:
+        return Paths.under(self.home)
+
+
+@dataclass(frozen=True)
+class Paths:
+    """Grafter's local state, all under `Config.home` (`~` and env vars expanded)."""
+
+    home: Path
+    runs_dir: Path
+    lock_file: Path
+    db_file: Path
+    work_dir: Path
+
+    @classmethod
+    def under(cls, home: str | Path) -> Paths:
+        root = Path(os.path.expandvars(str(home))).expanduser()
+        return cls(
+            home=root,
+            runs_dir=root / "runs",
+            lock_file=root / "grafter.lock",
+            db_file=root / "grafter.db",
+            work_dir=root / "work",
+        )
 
 
 def load_config(path: str | Path) -> Config:
