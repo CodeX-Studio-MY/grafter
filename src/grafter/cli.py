@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
@@ -14,10 +14,11 @@ from pydantic import ValidationError
 from grafter import __version__
 from grafter.charter import load_charter
 from grafter.config import Config, RepoConfig, load_config
-from grafter.credentials import SecretError, load_secret
+from grafter.credentials import SecretError
+from grafter.doctor import run_checks
 from grafter.engines import AgentEngine, get_engine
 from grafter.gateway import GatewayClient, GatewayError, redact
-from grafter.github import AppAuth, GitHubClient
+from grafter.github import AppAuth, GitHubClient, app_auth
 from grafter.lock import KillSwitchEngaged, LockHeld
 from grafter.pipeline import RunDeps, run_night
 from grafter.runner import LocalRunner
@@ -158,7 +159,6 @@ def db_backup(
     typer.secho(f"ok: backup written to {out}", fg=typer.colors.GREEN)
 
 
-APP_KEY_SECRET = "GITHUB_APP_PRIVATE_KEY"
 EXIT_KILL_SWITCH = 3
 EXIT_LOCK_HELD = 4
 
@@ -185,15 +185,6 @@ def _engine(cfg: Config) -> AgentEngine:
         ) from e
     except ValueError as e:
         raise _fail(str(e), 2) from e
-
-
-def app_auth(cfg: Config, environ: Mapping[str, str] | None = None) -> AppAuth:
-    """AppAuth from the config ids and the private key secret; SecretError if unavailable."""
-    ids = cfg.github_app
-    if ids.app_id is None or ids.installation_id is None:
-        raise SecretError("github_app.app_id and github_app.installation_id are not set")
-    key = load_secret(APP_KEY_SECRET, environ=environ, forbidden_dirs=[cfg.paths().work_dir])
-    return AppAuth(ids.app_id, ids.installation_id, key, api_url=ids.api_url)
 
 
 def origin_url_for(auth: AppAuth | None) -> Callable[[RepoConfig], str]:
@@ -263,6 +254,27 @@ def run(
         raise typer.Exit(EXIT_KILL_SWITCH)
     if summary.failed:
         raise typer.Exit(1)
+
+
+_STATUS_COLOR = {"ok": typer.colors.GREEN, "warn": typer.colors.YELLOW, "fail": typer.colors.RED}
+
+
+@app.command()
+def doctor(
+    config: Annotated[Path, typer.Option("--config", help="grafter.yaml")] = Path("grafter.yaml"),
+) -> None:
+    """Check this host: config, home, kill switch, lock, DB, git, Docker, engine, gateway, App."""
+    checks = run_checks(config)
+    width = max(len(c.name) for c in checks)
+    for c in checks:
+        status = typer.style(f"{c.status:<4}", fg=_STATUS_COLOR[c.status])
+        typer.echo(f"{status}  {c.name:<{width}}  {c.detail}")
+    failed = [c.name for c in checks if c.status == "fail"]
+    if failed:
+        typer.secho(f"{len(failed)} check(s) failed: {', '.join(failed)}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    warned = sum(c.status == "warn" for c in checks)
+    typer.secho(f"ok ({warned} warning(s))", fg=typer.colors.GREEN)
 
 
 if __name__ == "__main__":
