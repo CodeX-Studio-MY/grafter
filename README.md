@@ -34,6 +34,7 @@ schedule → find work → write fix (sandbox) → tests + reviewer + charter ju
 - [Branch and change model](docs/branch-model.md)
 - [Tiered autonomy and guardrails](docs/autonomy.md)
 - [Roadmap](docs/roadmap.md)
+- [Operations (draft)](docs/operations.md)
 - [Landscape and prior art](docs/landscape.md)
 
 ## Development
