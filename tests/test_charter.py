@@ -19,7 +19,9 @@ def test_example_charter_loads(charter):
     assert charter.solution == "AcmeHarvest"
     assert charter.is_protected("grafter.charter.yaml")
     assert charter.is_protected("auth/login.cs")
-    assert charter.needs_review("db/migrations/001.sql")
+    assert charter.needs_review("db/migrations/001.sql", "api")
+    assert not charter.needs_review("db/migrations/001.sql", "web")
+    assert charter.is_protected("android/app/build.gradle", "mobile")
     assert not charter.is_protected("src/lots.cs")
 
 

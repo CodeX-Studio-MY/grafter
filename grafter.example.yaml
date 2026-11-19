@@ -1,6 +1,32 @@
-repos:
-  - your-org/your-api
-  - your-org/your-web
+repos:                    # one entry per repo of the solution (fictional example)
+  - name: api             # short id: lowercase, digits, - and _; used by the charter's `repos:`
+    github: your-org/your-api
+    default_branch: main
+    language: dotnet      # free text: dotnet, node, flutter, python, ...
+    test_command: dotnet test
+    coverage_command: dotnet test --collect:"XPlat Code Coverage"
+    test_paths:           # globs; a `test` change may touch only these
+      - tests/**
+      - "**/*.Tests/**"
+    sandbox_image: mcr.microsoft.com/dotnet/sdk:8.0   # empty = engine default
+  - name: web
+    github: your-org/your-web
+    language: node
+    test_command: npm test
+    coverage_command: npm run test:coverage
+    test_paths:
+      - "**/*.test.ts"
+      - "**/*.test.tsx"
+      - "**/__tests__/**"
+    sandbox_image: node:20
+  - name: mobile
+    github: your-org/your-mobile
+    language: flutter
+    test_command: flutter test
+    coverage_command: flutter test --coverage
+    test_paths:
+      - test/**
+      - integration_test/**
 branches:
   production: main
   preview: ai/preview

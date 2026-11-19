@@ -34,7 +34,7 @@ def check(task: Task, result: RunResult, charter: Charter, limits: Limits | None
     if task.change_type not in charter.allowed_change_types:
         reasons.append(f"change type not allowed: {task.change_type}")
 
-    touched_protected = [f for f in touched if charter.is_protected(f)]
+    touched_protected = [f for f in touched if charter.is_protected(f, task.repo)]
     if touched_protected:
         reasons.append(f"touches protected paths: {touched_protected}")
 
@@ -50,7 +50,7 @@ def check(task: Task, result: RunResult, charter: Charter, limits: Limits | None
     if reasons:
         return Verdict(allowed=False, reasons=reasons)
 
-    if any(charter.needs_review(f) for f in touched):
+    if any(charter.needs_review(f, task.repo) for f in touched):
         return Verdict(allowed=True, tier=Tier.REVIEW, reasons=["touches review paths"])
     # Tier 0 is only a patch-level dependency bump touching at most 2 files.
     # Security changes are never Tier 0 (see docs/autonomy.md).

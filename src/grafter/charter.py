@@ -28,6 +28,25 @@ class FeaturePolicy(StrEnum):
 # Locked for every charter, whatever its protected_paths say (appended, deduped).
 ALWAYS_PROTECTED = ("grafter.charter.yaml", "grafter.yaml", "**/AGENTS.md", ".github/", ".grafter/")
 
+# Short repo id used in config (`repos[].name`) and charter (`repos:` keys).
+REPO_NAME_PATTERN = r"^[a-z0-9][a-z0-9_-]*$"
+_REPO_NAME = re.compile(REPO_NAME_PATTERN)
+
+
+class RepoRules(BaseModel):
+    """Extra path rules for one repo, applied on top of the global ones."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    protected_paths: list[str] = Field(default_factory=list)
+    review_paths: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _paths(self) -> RepoRules:
+        self.protected_paths = normalise_patterns(self.protected_paths)
+        self.review_paths = normalise_patterns(self.review_paths)
+        return self
+
 
 class Charter(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -42,27 +61,39 @@ class Charter(BaseModel):
     review_paths: list[str] = Field(default_factory=list)
     allowed_change_types: list[ChangeType] = Field(min_length=1)
     feature_changes: FeaturePolicy = FeaturePolicy.PROPOSE_ONLY
+    repos: dict[str, RepoRules] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _paths(self) -> Charter:
-        self.protected_paths = _dedupe(
-            [_normalise_pattern(p) for p in [*self.protected_paths, *ALWAYS_PROTECTED]]
-        )
-        self.review_paths = _dedupe([_normalise_pattern(p) for p in self.review_paths])
-        overlap = {p.casefold() for p in self.protected_paths} & {
-            p.casefold() for p in self.review_paths
-        }
-        if overlap:
-            raise ValueError(f"paths cannot be both protected and review: {sorted(overlap)}")
+        self.protected_paths = normalise_patterns([*self.protected_paths, *ALWAYS_PROTECTED])
+        self.review_paths = normalise_patterns(self.review_paths)
+        _check_overlap(self.protected_paths, self.review_paths, "")
+        for name, rules in self.repos.items():
+            if not _REPO_NAME.match(name):
+                raise ValueError(f"invalid repo name {name!r} (must match {REPO_NAME_PATTERN})")
+            _check_overlap(
+                [*self.protected_paths, *rules.protected_paths],
+                [*self.review_paths, *rules.review_paths],
+                f" in repo {name!r}",
+            )
         return self
 
-    def is_protected(self, path: str) -> bool:
-        """True if `path` is protected. Unsafe paths fail closed (True)."""
-        return _matches(path, self.protected_paths)
+    def _rules(self, repo: str | None) -> RepoRules:
+        return self.repos.get(repo, _NO_RULES) if repo is not None else _NO_RULES
 
-    def needs_review(self, path: str) -> bool:
-        """True if `path` needs human review. Unsafe paths fail closed (True)."""
-        return _matches(path, self.review_paths)
+    def is_protected(self, path: str, repo: str | None = None) -> bool:
+        """True if `path` is protected globally or in `repo`. Unsafe paths fail closed."""
+        return matches_any(path, [*self.protected_paths, *self._rules(repo).protected_paths])
+
+    def needs_review(self, path: str, repo: str | None = None) -> bool:
+        """True if `path` needs review globally or in `repo`. Unsafe paths fail closed."""
+        return matches_any(path, [*self.review_paths, *self._rules(repo).review_paths])
+
+
+def _check_overlap(protected: list[str], review: list[str], where: str) -> None:
+    overlap = {p.casefold() for p in protected} & {p.casefold() for p in review}
+    if overlap:
+        raise ValueError(f"paths cannot be both protected and review{where}: {sorted(overlap)}")
 
 
 class UnsafePathError(ValueError):
@@ -112,6 +143,12 @@ def _normalise_pattern(pattern: str) -> str:
     return norm + "/" if is_dir else norm
 
 
+def normalise_patterns(patterns: list[str]) -> list[str]:
+    """Normalise glob patterns like paths (keeping a trailing `/`) and dedupe them
+    case-insensitively. Raises UnsafePathError for unsafe patterns."""
+    return _dedupe([_normalise_pattern(p) for p in patterns])
+
+
 def _dedupe(patterns: list[str]) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
@@ -144,12 +181,18 @@ def _compile(pattern: str) -> re.Pattern[str]:
     return re.compile(rx, re.IGNORECASE | re.DOTALL)
 
 
-def _matches(path: str, patterns: list[str]) -> bool:
+def matches_any(path: str, patterns: list[str]) -> bool:
+    """True if `path` matches any glob in `patterns` (already normalised, see
+    `normalise_patterns`). Unsafe paths fail closed (True): callers using this as an
+    allow-list must also reject unsafe paths, e.g. via `Charter.is_protected`."""
     try:
         norm = normalise_path(path)
     except UnsafePathError:
         return True
     return any(_compile(p).fullmatch(norm) for p in patterns)
+
+
+_NO_RULES = RepoRules()
 
 
 def load_charter(path: str | Path) -> Charter:

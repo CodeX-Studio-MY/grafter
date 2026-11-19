@@ -11,6 +11,11 @@ invariants:
   - invoice numbers are immutable once issued
   - no breaking API change without a version bump
 protected_paths: [auth/, .github/, grafter.charter.yaml]
-review_paths: [db/migrations/]
+review_paths: []
+repos:                      # extra rules per repo (keys = repo names in grafter.yaml)
+  api:
+    review_paths: [db/migrations/]
+  mobile:
+    protected_paths: [ios/Runner.xcodeproj/, android/app/build.gradle]
 allowed_change_types: [bugfix, security, performance, test, refactor, docs, dependency]
 feature_changes: propose_only

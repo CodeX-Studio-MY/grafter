@@ -47,6 +47,16 @@ def test_guard_review_paths_are_tier2(charter):
     assert v.allowed and v.tier == Tier.REVIEW
 
 
+def test_guard_uses_task_repo_rules(charter):
+    web = Task(id="1", repo="web", change_type=ChangeType.BUGFIX, charter_ref="x", instruction="x")
+    mobile = Task(
+        id="1", repo="mobile", change_type=ChangeType.BUGFIX, charter_ref="x", instruction="x"
+    )
+    assert check(web, result("db/migrations/2.sql"), charter).tier == Tier.APPROVE
+    assert check(web, result("android/app/build.gradle"), charter).allowed
+    assert not check(mobile, result("android/app/build.gradle"), charter).allowed
+
+
 def test_patch_dependency_bump_is_tier0(charter):
     v = check(task(ChangeType.DEPENDENCY, bump="patch"), result("a.csproj"), charter)
     assert v.allowed and v.tier == Tier.AUTO
