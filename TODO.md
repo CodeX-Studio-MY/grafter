@@ -29,17 +29,13 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [ ] **0A6** 🧑 Ruleset on Grafter's own `main`: PR + `test` check required, no force push.
 
 ### 0B Harden the scaffold (from review of the scaffold)
-- [ ] **0B1** Normalise paths in `charter._matches` (`./`, `\`, `..`, case), reject paths escaping the repo, add glob support. Done when: bypass tests pass.
-- [ ] **0B2** Always-protected set: `grafter.charter.yaml`, `grafter.yaml`, `AGENTS.md`, `.github/`, `.grafter/`. Done when: a test proves each one is blocked.
-- [x] **0B3** Tier 0 only for `dependency` patch-level bumps (add version-delta info to `Task`/`RunResult`); agent-written `security` changes are Tier 1 minimum. Done when: guard tests updated and pass.
-- [x] **0B4** Guard: max diff size (files + lines) from config → reject. Done when: test.
 - [x] **0B1** Normalise paths in `charter._matches` (`./`, `\`, `..`, case), reject paths escaping the repo, add glob support. Done when: bypass tests pass.
 - [x] **0B2** Always-protected set: `grafter.charter.yaml`, `grafter.yaml`, `AGENTS.md`, `.github/`, `.grafter/`. Done when: a test proves each one is blocked.
-- [ ] **0B3** Tier 0 only for `dependency` patch-level bumps (add version-delta info to `Task`/`RunResult`); agent-written `security` changes are Tier 1 minimum. Done when: guard tests updated and pass.
-- [ ] **0B4** Guard: max diff size (files + lines) from config → reject. Done when: test.
-- [ ] **0B5** Guard: a `test` change may touch only test paths (per-repo `test_paths` globs) and may not delete test files or test functions. Done when: tests.
+- [x] **0B3** Tier 0 only for `dependency` patch-level bumps (add version-delta info to `Task`/`RunResult`); agent-written `security` changes are Tier 1 minimum. Done when: guard tests updated and pass.
+- [x] **0B4** Guard: max diff size (files + lines) from config → reject. Done when: test.
+- [x] **0B5** Guard: a `test` change may touch only test paths (per-repo `test_paths` globs) and may not delete test files or test functions. Done when: tests.
 - [x] **0B6** Guard: secret scan of the diff (regex set or `detect-secrets`) → reject. Done when: test with a fake key.
-- [ ] **0B7** Per-repo config: `name`, `default_branch`, `language`, `test_command`, `coverage_command`, `test_paths`, `sandbox_image`. Charter paths become repo-scoped. Update example + add `grafter validate --config`. Done when: example validates.
+- [x] **0B7** Per-repo config: `name`, `default_branch`, `language`, `test_command`, `coverage_command`, `test_paths`, `sandbox_image`. Charter paths become repo-scoped. Update example + add `grafter validate --config`. Done when: example validates.
 - [x] **0B8** Config: `kill_switch` (file/env), `dry_run`, `nightly_focus` rotation, `model`, GitHub App ids (ids only; secrets via env). Done when: tests.
 
 ### 0C Pilot preparation (outside this repo)
