@@ -1,0 +1,4 @@
+# Alternative to the systemd timer (TODO 1D5). Install with: crontab -u grafter deploy/cron/grafter.cron
+# Grafter's own run lock prevents overlapping runs.
+SHELL=/bin/bash
+0 2 * * * set -a; . /home/grafter/.grafter/env; set +a; /opt/grafter/.venv/bin/grafter run --config /home/grafter/.grafter/grafter.yaml >> /home/grafter/.grafter/cron.log 2>&1
