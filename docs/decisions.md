@@ -20,6 +20,8 @@
 | D16 | 2026-11-20 | Hard spend cap **$5 per night** (`limits.usd_budget_per_night`), enforced as `max_budget` on the LiteLLM virtual key; the token budget stays as a second limit | About $150 a month; fits 3 PRs a night at Opus/Sonnet prices with caching |
 | D17 | 2026-11-20 | State store: **SQLite**, one file on the Grafter host's local disk (default `~/.grafter/grafter.db`), WAL mode + busy timeout, nightly `.backup` copy. Only the Grafter process opens it, never sandboxes. Schema stays portable (migrations from day one, plain SQL types, no SQLite-only features). **PostgreSQL is parked for the enterprise evaluation** (D2) | 1:1, single writer, tiny data volume; nothing extra to run, secure or back up. Portable schema keeps a later move cheap |
 
+| D18 | 2026-11-20 | LiteLLM runs with **its own private PostgreSQL** in the same compose stack (`deploy/litellm/`), no published port. It is the gateway's key/spend store only, not Grafter state (D17 stays SQLite) | LiteLLM's virtual keys and budgets require Postgres; keeps per-run scoped keys and the hard daily cap (D16) at the gateway |
+
 Prices at decision time (Anthropic API, per 1M tokens): Opus 5.5 $4 in / $20 out; Sonnet 5.5 $2 in / $10 out.
 
 ## Open
