@@ -49,7 +49,9 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [ ] **0D1** 🧑 Provision Linux VM (Ubuntu LTS): rootless Docker, Python 3.12, git, non-root `grafter` user; nightly backup of the SQLite file (D17).
 - [ ] **0D2** 🧑 Create GitHub App: contents RW, pull requests RW, issues RW, checks R, metadata R. Install on pilot + sandbox repos only. Private key on the VM (mode 0600), never in git.
 - [ ] **0D3** 🧑 Ruleset on each pilot repo `main`: PR + 1 human approval + `test` check, no force push, App not in bypass list. App may push only to `ai/*`.
-- [ ] **0D4** LiteLLM gateway on the VM (docker compose in `deploy/`), per-run virtual key with `max_budget` = `limits.usd_budget_per_night` (D16); Anthropic routes for `models.*` (D15). Done when: a request through the gateway returns a completion.
+- [ ] **0D4** LiteLLM gateway on the VM, split:
+  - [x] **0D4a** `deploy/litellm/` compose (LiteLLM v1.108.1 + private Postgres, D18), model routes for `models.*` (D15), `GatewayClient` (per-run key with `max_budget` + `budget_duration`, D16) and `grafter gateway check`. Done when: tests against a fake gateway pass and `docker compose config` validates.
+  - [ ] **0D4b** 🧑 `docker compose up -d` on the VM with a real `.env`. Done when: `grafter gateway check` prints ok.
 - [ ] **0D5** Fictional end-to-end test repo `grafter-sandbox` (tiny app in the style of `examples/acme-harvest`, weak tests). All phase-1 testing happens here before the pilot. Done when: repo exists, App installed, ruleset on.
 
 **Gate 0 → 1:** charter validated · coverage known · thresholds recorded · VM + App + rulesets live.
