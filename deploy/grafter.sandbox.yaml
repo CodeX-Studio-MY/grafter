@@ -1,0 +1,22 @@
+# Grafter config for the fictional sandbox repo (TODO 0D5). Copy to ~/.grafter/grafter.yaml
+# on the VM and replace OWNER. Secrets come from env vars, never from this file.
+repos:
+  - name: api
+    github: OWNER/grafter-sandbox
+    default_branch: main
+    language: python
+    test_command: pytest -q
+    coverage_command: pytest -q --cov --cov-report=json
+    test_paths:
+      - tests/**
+    sandbox_image: python:3.12-slim
+limits:
+  max_prs_per_night: 1
+  usd_budget_per_night: 5.0
+engine: openhands
+llm_gateway_url: http://127.0.0.1:4000
+dry_run: true              # flip to false after a few clean dry-run nights (1F1)
+nightly_focus: [test]
+github_app:
+  app_id: null             # fill in after 0D2
+  installation_id: null
