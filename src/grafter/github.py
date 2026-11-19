@@ -16,7 +16,7 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol
 
 import jwt as pyjwt
 
@@ -146,3 +146,95 @@ class AppAuth:
             raise GitHubError("unexpected installation token response: bad expires_at") from None
         self._token, self._expires_at = token, expires_at
         return token
+
+
+class TokenProvider(Protocol):
+    def token(self) -> str: ...
+
+
+_REPO_RE = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+PER_PAGE = 100
+MAX_PAGES = 100  # 10,000 items; a guard against a server that never stops paging
+
+
+def _check_repo(repo: str) -> str:
+    if not _REPO_RE.fullmatch(repo) or ".." in repo:
+        raise GitHubError(f"invalid repo name (want owner/name): {repo!r}")
+    return repo
+
+
+class GitHubClient:
+    """The GitHub REST calls Grafter needs. Opens PRs only from `ai/*` branches."""
+
+    def __init__(self, auth: TokenProvider, api_url: str = API_URL, timeout: float = 30.0) -> None:
+        self.auth = auth
+        self.api_url = _check_url(api_url)
+        self.timeout = timeout
+
+    def __repr__(self) -> str:
+        return f"GitHubClient(api_url={self.api_url!r})"
+
+    def _request(
+        self,
+        method: str,
+        path: str,
+        body: Any = None,
+        params: dict[str, Any] | None = None,
+    ) -> Any:
+        return _request(self.api_url, method, path, self.auth.token(), body, params, self.timeout)
+
+    def _paginate(
+        self, path: str, params: dict[str, Any] | None = None, key: str | None = None
+    ) -> list[dict[str, Any]]:
+        """GET every page of a list endpoint (`page` param until a short page)."""
+        items: list[dict[str, Any]] = []
+        for page in range(1, MAX_PAGES + 1):
+            resp = self._request(
+                "GET", path, params={**(params or {}), "per_page": PER_PAGE, "page": page}
+            )
+            if key is not None:
+                resp = resp.get(key) if isinstance(resp, dict) else None
+            batch = resp
+            if not isinstance(batch, list) or not all(isinstance(i, dict) for i in batch):
+                raise GitHubError(f"GET {path} -> unexpected response shape")
+            items.extend(batch)
+            if len(batch) < PER_PAGE:
+                break
+        return items
+
+    def installation_repos(self) -> list[str]:
+        """Full names (`owner/name`) of every repo the installation can access."""
+        repos = self._paginate("/installation/repositories", key="repositories")
+        return [str(r["full_name"]) for r in repos]
+
+    def ensure_labels(self, repo: str, labels: dict[str, str]) -> list[str]:
+        """Create the labels `repo` lacks (GitHub matches names case-insensitively).
+        Returns the names created."""
+        path = f"/repos/{_check_repo(repo)}/labels"
+        existing = {str(lb.get("name", "")).lower() for lb in self._paginate(path)}
+        created: list[str] = []
+        for name, color in labels.items():
+            if name.lower() not in existing:
+                self._request("POST", path, {"name": name, "color": color})
+                created.append(name)
+        return created
+
+    def create_pr(
+        self, repo: str, head: str, base: str, title: str, body: str, labels: list[str]
+    ) -> dict[str, Any]:
+        """Open a PR from an `ai/*` branch, then label it."""
+        _check_repo(repo)
+        if not head.startswith("ai/") or head == "ai/":
+            raise GitHubError(f"refusing PR from non-ai/ branch: {head!r}")
+        if not base.strip():
+            raise GitHubError("PR base branch is empty")
+        pr = self._request(
+            "POST",
+            f"/repos/{repo}/pulls",
+            {"title": title, "head": head, "base": base, "body": body},
+        )
+        if not isinstance(pr, dict) or not isinstance(pr.get("number"), int):
+            raise GitHubError("unexpected create-PR response")
+        if labels:
+            self._request("POST", f"/repos/{repo}/issues/{pr['number']}/labels", {"labels": labels})
+        return pr

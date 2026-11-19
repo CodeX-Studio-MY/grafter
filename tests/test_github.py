@@ -1,4 +1,5 @@
 import json
+import re
 import threading
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -11,7 +12,7 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from grafter.github import AppAuth, GitHubError
+from grafter.github import AppAuth, GitHubClient, GitHubError, scrub
 
 APP_ID = 1234
 INSTALLATION_ID = 5678
@@ -103,7 +104,7 @@ class FakeGitHub:
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
-        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        threading.Thread(target=self.server.serve_forever, args=(0.02,), daemon=True).start()
 
     # -- routing ----------------------------------------------------------------
 
@@ -135,10 +136,56 @@ class FakeGitHub:
         self.issued.append(token)
         return 201, {"token": token, "expires_at": iso(now + self.token_ttl)}
 
+    @staticmethod
+    def page(items: list[Any], query: dict[str, list[str]]) -> list[Any]:
+        per_page = int(query.get("per_page", ["30"])[0])
+        page = int(query.get("page", ["1"])[0])
+        return items[(page - 1) * per_page : page * per_page]
+
     def api(
         self, method: str, path: str, query: dict[str, list[str]], body: Any
     ) -> tuple[int, Any]:
+        if (method, path) == ("GET", "/installation/repositories"):
+            repos = [{"full_name": r} for r in self.repos]
+            return 200, {"total_count": len(repos), "repositories": self.page(repos, query)}
+        m = re.fullmatch(r"/repos/([^/]+/[^/]+)/(labels|pulls|issues/(\d+)/labels)", path)
+        if not m:
+            return 404, {"message": "Not Found"}
+        repo, what, number = m.group(1), m.group(2), m.group(3)
+        if (method, what) == ("GET", "labels"):
+            labels = [{"name": n} for n in self.labels.get(repo, [])]
+            return 200, self.page(labels, query)
+        if (method, what) == ("POST", "labels"):
+            self.labels.setdefault(repo, []).append(body["name"])
+            return 201, body
+        if (method, what) == ("POST", "pulls"):
+            pulls = self.pulls.setdefault(repo, [])
+            pr = {
+                "number": len(pulls) + 1,
+                "state": "open",
+                "title": body["title"],
+                "body": body["body"],
+                "head": {"ref": body["head"]},
+                "base": {"ref": body["base"]},
+                "html_url": f"https://github.example/{repo}/pull/{len(pulls) + 1}",
+            }
+            pulls.append(pr)
+            return 201, pr
+        if (method, what) == ("GET", "pulls"):
+            state = query.get("state", ["open"])[0]
+            pulls = [p for p in self.pulls.get(repo, []) if state == "all" or p["state"] == state]
+            return 200, self.page(pulls, query)
+        if method == "POST" and number:
+            pr = self.pulls[repo][int(number) - 1]
+            pr["labels"] = [{"name": n} for n in body["labels"]]
+            return 200, pr["labels"]
         return 404, {"message": "Not Found"}
+
+    def add_pr(self, repo: str, head: str, body: str | None, state: str = "open") -> None:
+        pulls = self.pulls.setdefault(repo, [])
+        pulls.append(
+            {"number": len(pulls) + 1, "state": state, "body": body, "head": {"ref": head}}
+        )
 
     def paths(self) -> list[tuple[str, str]]:
         return [(c[0], c[1]) for c in self.calls]
@@ -246,3 +293,162 @@ def test_unreachable_api(keypair: tuple[str, str]) -> None:
     with pytest.raises(GitHubError, match="unreachable") as exc:
         a.token()
     assert exc.value.status is None
+
+
+# --- GitHubClient --------------------------------------------------------------
+
+REPO = "acme/harvest-api"
+
+
+class StaticToken:
+    def __init__(self, token: str) -> None:
+        self._token = token
+
+    def token(self) -> str:
+        return self._token
+
+
+@pytest.fixture
+def client(auth: AppAuth, fake: FakeGitHub) -> GitHubClient:
+    return GitHubClient(auth, api_url=fake.url)
+
+
+def test_client_accepts_any_token_provider(fake: FakeGitHub) -> None:
+    fake.issued.append("ghp_static0000000000")
+    fake.repos = ["acme/one"]
+    c = GitHubClient(StaticToken("ghp_static0000000000"), api_url=fake.url)
+    assert c.installation_repos() == ["acme/one"]
+    assert fake.headers[0]["authorization"] == "Bearer ghp_static0000000000"
+    assert fake.headers[0]["user-agent"] == "grafter"
+
+
+def test_client_reuses_cached_token(client: GitHubClient, fake: FakeGitHub) -> None:
+    client.installation_repos()
+    client.installation_repos()
+    assert len(fake.issued) == 1
+
+
+def test_installation_repos_paginates(client: GitHubClient, fake: FakeGitHub) -> None:
+    fake.repos = [f"acme/r{i:03d}" for i in range(250)]
+    assert client.installation_repos() == fake.repos
+    pages = [c[2]["page"] for c in fake.calls if c[1] == "/installation/repositories"]
+    assert pages == [["1"], ["2"], ["3"]]
+
+
+def test_installation_repos_exact_page_boundary(client: GitHubClient, fake: FakeGitHub) -> None:
+    fake.repos = [f"acme/r{i:03d}" for i in range(100)]
+    assert len(client.installation_repos()) == 100
+    assert sum(c[1] == "/installation/repositories" for c in fake.calls) == 2
+
+
+def test_installation_repos_empty(client: GitHubClient, fake: FakeGitHub) -> None:
+    assert client.installation_repos() == []
+
+
+def test_installation_repos_bad_shape(
+    client: GitHubClient, fake: FakeGitHub, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(fake, "api", lambda *a: (200, ["not", "a", "dict"]))
+    with pytest.raises(GitHubError, match="unexpected"):
+        client.installation_repos()
+
+
+def test_ensure_labels_creates_only_missing(client: GitHubClient, fake: FakeGitHub) -> None:
+    fake.labels[REPO] = ["grafter", "Tier-1"]
+    created = client.ensure_labels(REPO, {"grafter": "5319e7", "tier-1": "fbca04", "x": "000000"})
+    assert created == ["x"]
+    posts = [c for c in fake.calls if c[0] == "POST" and c[1] == f"/repos/{REPO}/labels"]
+    assert [c[3] for c in posts] == [{"name": "x", "color": "000000"}]
+
+
+def test_ensure_labels_paginates(client: GitHubClient, fake: FakeGitHub) -> None:
+    fake.labels[REPO] = [f"l{i}" for i in range(150)]
+    assert client.ensure_labels(REPO, {"l149": "ffffff"}) == []
+
+
+def test_create_pr_then_labels(client: GitHubClient, fake: FakeGitHub) -> None:
+    pr = client.create_pr(REPO, "ai/t1", "main", "title", "body", ["grafter", "tier-1"])
+    assert pr["number"] == 1
+    assert fake.paths()[-2:] == [
+        ("POST", f"/repos/{REPO}/pulls"),
+        ("POST", f"/repos/{REPO}/issues/1/labels"),
+    ]
+    assert fake.calls[-2][3] == {"title": "title", "head": "ai/t1", "base": "main", "body": "body"}
+    assert fake.calls[-1][3] == {"labels": ["grafter", "tier-1"]}
+    assert fake.pulls[REPO][0]["labels"] == [{"name": "grafter"}, {"name": "tier-1"}]
+
+
+def test_create_pr_without_labels_skips_label_call(client: GitHubClient, fake: FakeGitHub) -> None:
+    client.create_pr(REPO, "ai/t1", "main", "t", "b", [])
+    assert fake.paths()[-1] == ("POST", f"/repos/{REPO}/pulls")
+
+
+@pytest.mark.parametrize("head", ["main", "feature/x", "ai", "xai/x", "ai/", ""])
+def test_create_pr_refuses_non_ai_head(client: GitHubClient, fake: FakeGitHub, head: str) -> None:
+    with pytest.raises(GitHubError, match="ai/"):
+        client.create_pr(REPO, head, "main", "t", "b", [])
+    assert fake.calls == []
+
+
+@pytest.mark.parametrize("base", ["", "  "])
+def test_create_pr_refuses_empty_base(client: GitHubClient, fake: FakeGitHub, base: str) -> None:
+    with pytest.raises(GitHubError, match="base"):
+        client.create_pr(REPO, "ai/t1", base, "t", "b", [])
+    assert fake.calls == []
+
+
+def test_create_pr_bad_response(
+    client: GitHubClient, fake: FakeGitHub, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(fake, "api", lambda *a: (201, {"no": "number"}))
+    with pytest.raises(GitHubError, match="unexpected"):
+        client.create_pr(REPO, "ai/t1", "main", "t", "b", ["grafter"])
+
+
+@pytest.mark.parametrize("repo", ["acme", "acme/x/y", "../etc/passwd", "acme/x?y=1", ""])
+def test_rejects_bad_repo_names(client: GitHubClient, fake: FakeGitHub, repo: str) -> None:
+    with pytest.raises(GitHubError, match="repo"):
+        client.ensure_labels(repo, {"grafter": "ffffff"})
+    assert fake.calls == []
+
+
+def test_http_error_is_scrubbed(client: GitHubClient, fake: FakeGitHub) -> None:
+    client.installation_repos()  # obtain a token first
+    leak = f"{fake.issued[0]} ghp_abcdefghijklmnop github_pat_11ABCDEF_xyz"
+    fake.fail[("POST", f"/repos/{REPO}/pulls")] = (422, json.dumps({"message": leak}))
+    with pytest.raises(GitHubError) as exc:
+        client.create_pr(REPO, "ai/t1", "main", "t", "b", [])
+    msg = str(exc.value)
+    assert exc.value.status == 422
+    assert "HTTP 422" in msg
+    assert fake.issued[0] not in msg
+    assert "ghp_abcdefghijklmnop" not in msg and "github_pat_11ABCDEF_xyz" not in msg
+    assert "ghs_***" in msg and "ghp_***" in msg and "gith***" in msg
+
+
+def test_non_json_response(client: GitHubClient, fake: FakeGitHub) -> None:
+    client.installation_repos()
+    fake.fail[("GET", "/installation/repositories")] = (200, "<html>")
+    with pytest.raises(GitHubError, match="non-JSON"):
+        client.installation_repos()
+
+
+def test_empty_response_body(client: GitHubClient, fake: FakeGitHub) -> None:
+    client.installation_repos()
+    fake.fail[("GET", "/installation/repositories")] = (200, "")
+    with pytest.raises(GitHubError, match="unexpected"):
+        client.installation_repos()
+
+
+def test_scrub_and_repr() -> None:
+    assert scrub("x ghs_abcdef y") == "x ghs_*** y"
+    assert scrub("eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiIxIn0.c2ln") == "eyJh***"
+    assert scrub("no secrets here") == "no secrets here"
+    c = GitHubClient(StaticToken("ghp_secret0000"), api_url="http://x.example/")
+    assert "ghp_secret0000" not in repr(c)
+    assert c.api_url == "http://x.example"
+
+
+def test_client_rejects_non_http_url() -> None:
+    with pytest.raises(GitHubError, match="http"):
+        GitHubClient(StaticToken("t"), api_url="ftp://x")
