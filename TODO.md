@@ -64,9 +64,9 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 
 ### 1A Core plumbing
 - [ ] **1A1** Structured logging (JSON lines) + run id; logs in `~/.grafter/runs/<run-id>/`. Done when: `grafter run --dry-run` writes a log.
-- [ ] **1A2** Run lock so two cron runs never overlap; kill switch checked at start and between tasks. Done when: tests.
+- [x] **1A2** Run lock so two cron runs never overlap; kill switch checked at start and between tasks. Done when: tests.
 - [x] **1A3** SQLite state store (D17): `runs`, `changes`, `change_deps`, `change_events` tables + numbered migrations; WAL mode + busy timeout; path from config (default `~/.grafter/grafter.db`); `grafter db backup`. Done when: tests on a temp-file DB, incl. migrate-from-empty and a concurrent reader during a write.
-- [ ] **1A4** Secrets from env/file (App key, gateway key); refuse to start if a secret file sits inside a repo dir. Done when: test.
+- [x] **1A4** Secrets from env/file (App key, gateway key); refuse to start if a secret file sits inside a repo dir. Done when: test.
 
 ### 1B Git + GitHub
 - [ ] **1B1** Git wrapper: clone/fetch into work dir, cut `ai/<id>` from fresh `main`, commit as Grafter, push. Hard check: never pushes a non-`ai/*` ref. Done when: integration test against a local bare repo.
