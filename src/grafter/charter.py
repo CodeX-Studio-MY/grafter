@@ -25,7 +25,8 @@ class FeaturePolicy(StrEnum):
     PROPOSE_ONLY = "propose_only"
 
 
-ALWAYS_PROTECTED = ("grafter.charter.yaml",)
+# Locked for every charter, whatever its protected_paths say (appended, deduped).
+ALWAYS_PROTECTED = ("grafter.charter.yaml", "grafter.yaml", "**/AGENTS.md", ".github/", ".grafter/")
 
 
 class Charter(BaseModel):

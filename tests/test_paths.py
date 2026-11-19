@@ -1,6 +1,6 @@
 import pytest
 
-from grafter.charter import Charter, UnsafePathError, normalise_path
+from grafter.charter import ALWAYS_PROTECTED, Charter, UnsafePathError, normalise_path
 
 
 def make(protected: list[str] | None = None, review: list[str] | None = None) -> Charter:
@@ -185,3 +185,55 @@ def test_needs_review_normalises_and_fails_closed():
 def test_overlap_is_case_and_form_insensitive():
     with pytest.raises(ValueError):
         make(["db/"], ["DB\\"])
+
+
+# --- always-protected set --------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "grafter.charter.yaml",
+        "grafter.yaml",
+        "AGENTS.md",
+        "web/AGENTS.md",
+        "apps/mobile/agents.md",
+        ".github",
+        ".github/CODEOWNERS",
+        ".github/workflows/ci.yml",
+        ".grafter/state.db",
+        ".GitHub\Workflows\ci.yml",
+    ],
+)
+def test_always_protected_with_empty_charter(path):
+    assert make().is_protected(path)
+
+
+def test_always_protected_constant():
+    assert ALWAYS_PROTECTED == (
+        "grafter.charter.yaml",
+        "grafter.yaml",
+        "**/AGENTS.md",
+        ".github/",
+        ".grafter/",
+    )
+    assert all(p in make().protected_paths for p in ALWAYS_PROTECTED)
+
+
+def test_always_protected_is_deduped():
+    c = make([".github/", ".GITHUB/", "grafter.yaml", "auth/"])
+    keys = [p.casefold() for p in c.protected_paths]
+    assert len(keys) == len(set(keys))
+    assert "auth/" in c.protected_paths
+
+
+def test_always_protected_does_not_overmatch():
+    c = make()
+    assert not c.is_protected("docs/AGENTS.md.bak")
+    assert not c.is_protected("src/github/x.py")
+    assert not c.is_protected("web/grafter.yaml")
+
+
+def test_review_path_identical_to_always_protected_raises():
+    with pytest.raises(ValueError):
+        make(review=[".github/"])
