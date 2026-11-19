@@ -11,3 +11,13 @@ limits:
 engine: openhands
 tier0_auto_merge: false   # opt-in
 llm_gateway_url: http://localhost:4000
+model: ""                 # LiteLLM model name via the gateway; empty = gateway default
+dry_run: false            # true = do everything except push branches / open PRs
+kill_switch:              # run stops if the file exists or the env var is 1/true/yes/on
+  file: ~/.grafter/STOP
+  env: GRAFTER_STOP
+nightly_focus:            # rotates one per night: test, security, performance, bugfix, ...
+  - test
+github_app:               # ids only; the private key comes from an env var, never this file
+  app_id: null
+  installation_id: null

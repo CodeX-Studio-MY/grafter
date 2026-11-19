@@ -1,0 +1,118 @@
+from datetime import date, timedelta
+from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
+
+from grafter.charter import ChangeType
+from grafter.config import Config, GitHubApp, KillSwitch, load_config
+
+ROOT = Path(__file__).parent.parent
+REPOS = {"repos": ["org/api"]}
+
+
+def test_defaults() -> None:
+    c = Config.model_validate(REPOS)
+    assert c.dry_run is False
+    assert c.nightly_focus == [ChangeType.TEST]
+    assert c.model == ""
+    assert c.github_app == GitHubApp(app_id=None, installation_id=None)
+    assert c.kill_switch == KillSwitch(file="~/.grafter/STOP", env="GRAFTER_STOP")
+    assert c.tier0_auto_merge is False
+
+
+@pytest.mark.parametrize("value", ["1", "true", "YES", "On"])
+def test_kill_switch_env_truthy(value: str) -> None:
+    ks = KillSwitch(file="/nonexistent/grafter/STOP")
+    assert ks.is_engaged({"GRAFTER_STOP": value}) is True
+
+
+@pytest.mark.parametrize("value", ["", "0", "false", "no", "off", "maybe"])
+def test_kill_switch_env_falsy(value: str) -> None:
+    ks = KillSwitch(file="/nonexistent/grafter/STOP")
+    assert ks.is_engaged({"GRAFTER_STOP": value}) is False
+    assert ks.is_engaged({}) is False
+
+
+def test_kill_switch_uses_os_environ(monkeypatch: pytest.MonkeyPatch) -> None:
+    ks = KillSwitch(file="/nonexistent/grafter/STOP", env="MY_STOP")
+    monkeypatch.delenv("MY_STOP", raising=False)
+    assert ks.is_engaged() is False
+    monkeypatch.setenv("MY_STOP", "true")
+    assert ks.is_engaged() is True
+
+
+def test_kill_switch_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    ks = KillSwitch()  # ~/.grafter/STOP
+    assert ks.is_engaged({}) is False
+    stop = tmp_path / ".grafter" / "STOP"
+    stop.parent.mkdir()
+    stop.touch()
+    assert ks.is_engaged({}) is True
+
+
+def test_focus_rotation() -> None:
+    focus = [ChangeType.TEST, ChangeType.SECURITY, ChangeType.PERFORMANCE]
+    c = Config.model_validate({**REPOS, "nightly_focus": focus})
+    start = date(2026, 11, 20)
+    got = [c.focus_for(start + timedelta(days=i)) for i in range(6)]
+    first = focus.index(got[0])
+    assert got == [focus[(first + i) % 3] for i in range(6)]
+    assert set(got) == set(focus)
+
+
+def test_focus_single_default() -> None:
+    c = Config.model_validate(REPOS)
+    assert c.focus_for(date(2026, 1, 1)) is ChangeType.TEST
+
+
+def test_focus_rejects_empty_and_unknown() -> None:
+    with pytest.raises(ValidationError):
+        Config.model_validate({**REPOS, "nightly_focus": []})
+    with pytest.raises(ValidationError):
+        Config.model_validate({**REPOS, "nightly_focus": ["feature"]})
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {"github_app": {"app_id": 1, "private_key": "x"}},
+        {"github_app": {"private_key_path": "/k.pem"}},
+        {"webhook_secret": "x"},
+        {"password": "x"},
+        {"github_token": "x"},
+        {"llm_api_key": "x"},
+        {"limits": {"nested": [{"API_KEY": "x"}]}},
+    ],
+)
+def test_secret_keys_rejected(data: dict) -> None:
+    with pytest.raises(ValidationError, match="environment variable"):
+        Config.model_validate({**REPOS, **data})
+
+
+def test_token_budget_allowed() -> None:
+    c = Config.model_validate({**REPOS, "limits": {"token_budget_per_night": 1000}})
+    assert c.limits.token_budget_per_night == 1000
+
+
+@pytest.mark.parametrize(
+    "data",
+    [{"unknown": 1}, {"github_app": {"app_slug": "x"}}, {"kill_switch": {"path": "x"}}],
+)
+def test_extra_keys_rejected(data: dict) -> None:
+    with pytest.raises(ValidationError):
+        Config.model_validate({**REPOS, **data})
+
+
+def test_github_app_ids() -> None:
+    c = Config.model_validate({**REPOS, "github_app": {"app_id": 12, "installation_id": 34}})
+    assert (c.github_app.app_id, c.github_app.installation_id) == (12, 34)
+
+
+def test_example_yaml_loads() -> None:
+    c = load_config(ROOT / "grafter.example.yaml")
+    assert c.repos
+    assert c.dry_run is False
+    assert c.nightly_focus
