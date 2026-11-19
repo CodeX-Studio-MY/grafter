@@ -22,7 +22,15 @@ protected_paths: [..]       # never touched by the AI
 review_paths: [..]          # allowed, always Tier 2 (e.g. db/migrations/)
 allowed_change_types: [bugfix, security, performance, test, refactor, docs, dependency]
 feature_changes: propose_only
+repos:                      # optional extra rules per repo, on top of the global ones
+  <repo-name>:              # must match a `repos[].name` in grafter.yaml
+    protected_paths: [..]
+    review_paths: [..]
 ```
+
+Path rules for a change in repo `X` = global rules + `repos.X` rules. A repo with no entry gets only the global rules. A path may not be both protected and review, including across global and per-repo rules. `grafter validate CHARTER --config grafter.yaml` also checks that every `repos:` key names a configured repo.
+
+Each repo is configured in `grafter.yaml` (`repos[]`: `name`, `github`, `default_branch`, `language`, `test_command`, `coverage_command`, `test_paths`, `sandbox_image`); see [grafter.example.yaml](../grafter.example.yaml).
 
 See [examples/acme-harvest](../examples/acme-harvest) (fictional).
 

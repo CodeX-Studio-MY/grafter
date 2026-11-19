@@ -8,7 +8,17 @@ from grafter.charter import ChangeType
 from grafter.config import Config, GitHubApp, KillSwitch, load_config
 
 ROOT = Path(__file__).parent.parent
-REPOS = {"repos": ["org/api"]}
+REPOS = {
+    "repos": [
+        {
+            "name": "api",
+            "github": "org/api",
+            "language": "python",
+            "test_command": "pytest",
+            "test_paths": ["tests/**"],
+        }
+    ]
+}
 
 
 def test_defaults() -> None:
@@ -113,6 +123,7 @@ def test_github_app_ids() -> None:
 
 def test_example_yaml_loads() -> None:
     c = load_config(ROOT / "grafter.example.yaml")
-    assert c.repos
+    assert [r.name for r in c.repos] == ["api", "web", "mobile"]
+    assert c.repo("web").test_paths == ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**"]
     assert c.dry_run is False
     assert c.nightly_focus

@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from grafter.charter import ChangeType
+from grafter.charter import REPO_NAME_PATTERN, ChangeType, normalise_patterns
 
 
 class Branches(BaseModel):
@@ -81,10 +81,30 @@ def _find_secret_keys(data: Any, path: str = "") -> list[str]:
     return found
 
 
+class RepoConfig(BaseModel):
+    """One repo of the solution and how to test it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(pattern=REPO_NAME_PATTERN)  # short id, e.g. `api`; charter `repos:` key
+    github: str = Field(pattern=r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")  # owner/repo
+    default_branch: str = Field(default="main", min_length=1)
+    language: str = Field(min_length=1)  # free text: dotnet, node, flutter, python, ...
+    test_command: str = Field(min_length=1)
+    coverage_command: str = ""
+    test_paths: list[str] = Field(min_length=1)  # globs; a `test` change may touch only these
+    sandbox_image: str = ""  # Docker image; empty = engine default
+
+    @field_validator("test_paths")
+    @classmethod
+    def _norm_test_paths(cls, v: list[str]) -> list[str]:
+        return normalise_patterns(v)
+
+
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    repos: list[str] = Field(min_length=1)
+    repos: list[RepoConfig] = Field(min_length=1)
     branches: Branches = Branches()
     limits: Limits = Limits()
     engine: str = "openhands"
@@ -106,6 +126,21 @@ class Config(BaseModel):
                 "pass them via environment variables instead"
             )
         return data
+
+    @model_validator(mode="after")
+    def _unique_repo_names(self) -> Config:
+        names = [r.name for r in self.repos]
+        dupes = sorted({n for n in names if names.count(n) > 1})
+        if dupes:
+            raise ValueError(f"duplicate repo names: {dupes}")
+        return self
+
+    def repo(self, name: str) -> RepoConfig:
+        for r in self.repos:
+            if r.name == name:
+                return r
+        known = ", ".join(r.name for r in self.repos)
+        raise KeyError(f"unknown repo {name!r}; configured repos: {known}")
 
     def focus_for(self, day: date) -> ChangeType:
         return self.nightly_focus[day.toordinal() % len(self.nightly_focus)]
