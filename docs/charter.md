@@ -32,4 +32,5 @@ See [examples/acme-harvest](../examples/acme-harvest) (fictional).
 2. **Separate judge.** An agent that did not write the change scores charter alignment. Rejected changes are logged with the reason, never dropped silently.
 3. **Features never become code.** New capabilities arrive as issues only.
 4. **Locked.** The charter and protected paths are read-only to the AI.
+   Always protected, even if the charter omits them: `grafter.charter.yaml`, `grafter.yaml`, `**/AGENTS.md`, `.github/`, `.grafter/`.
 5. **Drift signals.** New modules, dependencies and domain vocabulary are flagged and tracked.

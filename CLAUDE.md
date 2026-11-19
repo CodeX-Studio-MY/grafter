@@ -13,7 +13,7 @@ Open-source (MIT) AI maintainer embedded 1:1 into ONE software solution. Nightly
 
 ## Definition of done (every TODO item)
 - One TODO group per branch + PR (e.g. 0B1–0B2), one commit per item tagged `[<id>]`. Branch cut from `main`.
-- Tests first; `ruff check . && ruff format --check . && pytest -q` green.
+- Tests first; `ruff check . && ruff format --check . && mypy && pytest -q` green.
 - Item's "Done when" check run; its output pasted in the PR body.
 - Box ticked in `TODO.md` in the same PR. Never tick an unverified item.
 - 🧑 items: prepare everything possible, then tell the user exactly what to do.
@@ -30,7 +30,7 @@ Open-source (MIT) AI maintainer embedded 1:1 into ONE software solution. Nightly
 ## Rules for working in this repo
 - Private until the pilot ends. NEVER commit pilot-solution code, client names or client data; use fictional `examples/`.
 - Copied code: MIT/Apache only, keep its notice, list it in `THIRD_PARTY.md`. No GPL/AGPL.
-- Before commit: `ruff check . && ruff format --check . && pytest -q` (or `pre-commit run -a`).
+- Before commit: `ruff check . && ruff format --check . && mypy && pytest -q` (or `pre-commit run -a`).
 - One TODO group per PR. Keep docs in `docs/` in sync with decisions.
 - User prefers terse, code-first answers.
 - Dev machine is Windows; the Grafter host is Linux. Keep paths POSIX in code (`PurePosixPath`), test both separators.
