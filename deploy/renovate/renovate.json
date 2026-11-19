@@ -1,0 +1,24 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "branchPrefix": "ai/deps-",
+  "labels": ["grafter", "type-dependency"],
+  "prConcurrentLimit": 3,
+  "prHourlyLimit": 2,
+  "schedule": ["before 6am"],
+  "automerge": false,
+  "dependencyDashboard": true,
+  "packageRules": [
+    {
+      "description": "Group patch bumps into one PR (Tier 0 candidates; merge stays human unless tier0_auto_merge is on)",
+      "matchUpdateTypes": ["patch"],
+      "groupName": "patch updates",
+      "addLabels": ["tier-0"]
+    },
+    {
+      "description": "Minor and major bumps stay separate and need approval",
+      "matchUpdateTypes": ["minor", "major"],
+      "addLabels": ["tier-1"]
+    }
+  ]
+}
