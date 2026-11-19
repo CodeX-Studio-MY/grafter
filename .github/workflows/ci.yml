@@ -21,3 +21,9 @@ jobs:
       - run: mypy
       - run: pytest -q
       - run: grafter validate examples/acme-harvest/grafter.charter.yaml
+      - name: sandbox template stays weakly tested (30-50% coverage)
+        working-directory: examples/sandbox-repo
+        run: |
+          pip install -e ".[dev]"
+          pytest -q -p no:cacheprovider --cov --cov-report=json:cov.json
+          python -c "import json,sys; p=json.load(open('cov.json'))['totals']['percent_covered']; print(f'sandbox coverage {p:.1f}%'); sys.exit(0 if 30 <= p <= 50 else 1)"

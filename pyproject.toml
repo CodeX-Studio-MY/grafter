@@ -33,6 +33,9 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["grafter", "acme_harvest"]  # acme_harvest: examples/sandbox-repo
+
 [tool.mypy]
 strict = true
 files = ["src"]

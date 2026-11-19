@@ -52,7 +52,9 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [ ] **0D4** LiteLLM gateway on the VM, split:
   - [x] **0D4a** `deploy/litellm/` compose (LiteLLM v1.108.1 + private Postgres, D18), model routes for `models.*` (D15), `GatewayClient` (per-run key with `max_budget` + `budget_duration`, D16) and `grafter gateway check`. Done when: tests against a fake gateway pass and `docker compose config` validates.
   - [ ] **0D4b** 🧑 `docker compose up -d` on the VM with a real `.env`. Done when: `grafter gateway check` prints ok.
-- [ ] **0D5** Fictional end-to-end test repo `grafter-sandbox` (tiny app in the style of `examples/acme-harvest`, weak tests). All phase-1 testing happens here before the pilot. Done when: repo exists, App installed, ruleset on.
+- [ ] **0D5** Fictional end-to-end test repo `grafter-sandbox`, split:
+  - [x] **0D5a** Template in `examples/sandbox-repo/` (Python AcmeHarvest API, ~36% coverage, `test` CI job, charter protecting `invoices.py`), `deploy/grafter.sandbox.yaml` (dry run, 1 PR/night) and `scripts/create-sandbox-repo.sh`. Done when: Grafter CI keeps the template at 30–50% coverage and its charter validates against the config.
+  - [ ] **0D5b** 🧑 Run `scripts/create-sandbox-repo.sh <owner>`, install the App (0D2), add the `main` ruleset. Done when: repo exists, App installed, ruleset on. All phase-1 testing happens here before the pilot.
 
 **Gate 0 → 1:** charter validated · coverage known · thresholds recorded · VM + App + rulesets live.
 
@@ -74,7 +76,7 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [ ] **1B5** `grafter doctor`: checks Docker, gateway, App permissions, rulesets present, kill switch state. Done when: all green on the VM.
 
 ### 1C Sandbox + engine
-- [ ] **1C1** Sandbox image for the sandbox repo (`sandboxes/`); network limited to the LiteLLM gateway; no host secrets mounted. Done when: container runs the repo's tests.
+- [ ] **1C1** Sandbox image for the sandbox repo (`sandboxes/`, base `python:3.12-slim`); network limited to the LiteLLM gateway; no host secrets mounted. Done when: container runs the repo's tests.
 - [ ] **1C2** Spike: OpenHands Software Agent SDK + DockerWorkspace hello-world (MIT packages only; verify licence; update `THIRD_PARTY.md`). Done when: agent edits a file inside the container.
 - [ ] **1C3** `OpenHandsEngine.run`: two steps (D15): `models.planner` writes a plan from task + charter + `AGENTS.md` + rules, then `models.coder` executes it; returns `RunResult` (changed files, summary, risks, tokens); token budget enforced. Done when: test with fake LLM + one real run on the sandbox repo.
 - [ ] **1C4** Fake engine for tests (deterministic diff). Done when: full pipeline test runs offline in CI.
