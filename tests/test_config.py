@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from grafter.charter import ChangeType
-from grafter.config import Config, GitHubApp, KillSwitch, load_config
+from grafter.config import Config, GitHubApp, KillSwitch, Models, load_config
 
 ROOT = Path(__file__).parent.parent
 REPOS = {
@@ -25,7 +25,13 @@ def test_defaults() -> None:
     c = Config.model_validate(REPOS)
     assert c.dry_run is False
     assert c.nightly_focus == [ChangeType.TEST]
-    assert c.model == ""
+    assert c.models == Models(
+        planner="claude-opus-5-5",
+        coder="claude-sonnet-5-5",
+        reviewer="claude-opus-5-5",
+        judge="claude-opus-5-5",
+    )
+    assert c.limits.usd_budget_per_night == 5.0
     assert c.github_app == GitHubApp(app_id=None, installation_id=None)
     assert c.kill_switch == KillSwitch(file="~/.grafter/STOP", env="GRAFTER_STOP")
     assert c.tier0_auto_merge is False
@@ -127,3 +133,27 @@ def test_example_yaml_loads() -> None:
     assert c.repo("web").test_paths == ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**"]
     assert c.dry_run is False
     assert c.nightly_focus
+
+
+def test_models_configurable_per_role() -> None:
+    c = Config.model_validate({**REPOS, "models": {"coder": "claude-opus-5-5", "judge": "x"}})
+    assert c.models.coder == "claude-opus-5-5"
+    assert c.models.judge == "x"
+    assert c.models.planner == "claude-opus-5-5"
+
+
+@pytest.mark.parametrize("bad", [{"coder": ""}, {"writer": "claude-opus-5-5"}])
+def test_models_rejects_empty_or_unknown_role(bad: dict[str, str]) -> None:
+    with pytest.raises(ValidationError):
+        Config.model_validate({**REPOS, "models": bad})
+
+
+@pytest.mark.parametrize("value", [0, -1])
+def test_usd_budget_must_be_positive(value: float) -> None:
+    with pytest.raises(ValidationError):
+        Config.model_validate({**REPOS, "limits": {"usd_budget_per_night": value}})
+
+
+def test_old_single_model_field_rejected() -> None:
+    with pytest.raises(ValidationError):
+        Config.model_validate({**REPOS, "model": "claude-opus-5-5"})

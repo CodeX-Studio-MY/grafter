@@ -29,6 +29,18 @@ class Limits(BaseModel):
     token_budget_per_night: int = Field(default=500_000, gt=0)
     max_files_per_change: int = Field(default=20, ge=1)
     max_lines_per_change: int = Field(default=400, ge=1)
+    usd_budget_per_night: float = Field(default=5.0, gt=0)  # hard cap on the LiteLLM key
+
+
+class Models(BaseModel):
+    """LiteLLM model name per agent role (D15). Reasoning roles use Opus, coding uses Sonnet."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    planner: str = Field(default="claude-opus-5-5", min_length=1)  # find work, plan the change
+    coder: str = Field(default="claude-sonnet-5-5", min_length=1)  # write code and tests
+    reviewer: str = Field(default="claude-opus-5-5", min_length=1)  # review the diff
+    judge: str = Field(default="claude-opus-5-5", min_length=1)  # charter alignment
 
 
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
@@ -110,7 +122,7 @@ class Config(BaseModel):
     engine: str = "openhands"
     tier0_auto_merge: bool = False
     llm_gateway_url: str = "http://localhost:4000"
-    model: str = ""  # LiteLLM model name via the gateway; empty = gateway default
+    models: Models = Models()
     dry_run: bool = False
     kill_switch: KillSwitch = KillSwitch()
     nightly_focus: list[ChangeType] = Field(default_factory=lambda: [ChangeType.TEST], min_length=1)
