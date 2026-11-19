@@ -27,6 +27,8 @@ class Limits(BaseModel):
 
     max_prs_per_night: int = Field(default=3, ge=1, le=10)
     token_budget_per_night: int = Field(default=500_000, gt=0)
+    max_files_per_change: int = Field(default=20, ge=1)
+    max_lines_per_change: int = Field(default=400, ge=1)
 
 
 _TRUTHY = frozenset({"1", "true", "yes", "on"})

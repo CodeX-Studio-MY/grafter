@@ -18,7 +18,7 @@ dependencies = [
 
 [project.optional-dependencies]
 openhands = ["openhands-sdk"]
-dev = ["pytest>=8", "ruff>=0.6", "pre-commit>=3.7"]
+dev = ["pytest>=8", "ruff>=0.6", "pre-commit>=3.7", "mypy>=1.11", "types-PyYAML", "pytest-cov>=5"]
 
 [project.scripts]
 grafter = "grafter.cli:app"
@@ -33,6 +33,21 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.mypy]
+strict = true
+files = ["src"]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = "--cov=grafter --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["grafter"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 75
+show_missing = true
