@@ -179,6 +179,10 @@ class AgentContainer:
                 "nofile=65536:65536",
                 "-e",
                 SESSION_KEY_ENV,
+                # No internet here: use LiteLLM's bundled price list instead of fetching it,
+                # which crashed the agent server at import when the fetch failed.
+                "-e",
+                "LITELLM_LOCAL_MODEL_COST_MAP=True",
                 self.s.image,
                 "--host",
                 "0.0.0.0",

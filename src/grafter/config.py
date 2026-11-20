@@ -69,6 +69,7 @@ class OpenHands(BaseModel):
     max_iterations: int = Field(default=60, ge=1, le=500)
     timeout_s: int = Field(default=1800, ge=60)
     plan_max_output: int = Field(default=2000, ge=100)  # planner reply cap, in tokens
+    coder_max_output: int = Field(default=8192, ge=256)  # per agent call, in tokens
     # 1D2c: the agent server sits only on the internal `network`; this relay publishes it.
     relay_image: str = Field(default="python:3.12.15-slim-bookworm", min_length=1)
     memory: str = Field(default="4g", min_length=1)

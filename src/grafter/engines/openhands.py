@@ -71,6 +71,9 @@ class LlmSpec:
     model: str  # LiteLLM proxy model name, e.g. "litellm_proxy/claude-sonnet-5-5"
     base_url: str  # as seen from inside the container
     api_key: str  # the run key; never the master or provider key
+    # Output cap per call. LiteLLM reserves input + max output against the key budget
+    # before each call; uncapped, one agent call reserved more than a task's whole budget.
+    max_output: int = 8192
 
 
 @dataclass(frozen=True)
@@ -207,6 +210,12 @@ def _fail(
     )
 
 
+def _summary(task: Task, plan: str) -> str:
+    """First line is the PR title (prbody): plain and short. Then the charter ref and plan."""
+    head = f"Add tests for {task.target}" if task.target else task.instruction.split(". ")[0]
+    return f"{head}\n\nCharter {task.charter_ref}.\n\nPlan:\n{plan.strip()}"[:2000]
+
+
 class OpenHandsEngine:
     name = "openhands"
 
@@ -276,7 +285,9 @@ class OpenHandsEngine:
             max_tokens=max(self.tokens_per_task - plan_tokens, 0),
             timeout_s=float(oh.timeout_s),
         )
-        llm = LlmSpec(f"litellm_proxy/{self.cfg.models.coder}", oh.gateway_url, key)
+        llm = LlmSpec(
+            f"litellm_proxy/{self.cfg.models.coder}", oh.gateway_url, key, oh.coder_max_output
+        )
         with tempfile.TemporaryDirectory(prefix="grafter-oh-") as tmp:
             tmpdir = Path(tmp)
             patch = tmpdir / "change.patch"
@@ -302,7 +313,7 @@ class OpenHandsEngine:
         return RunResult(
             success=True,
             changed_files=git.changed_files(),
-            summary=f"{task.charter_ref}. Plan:\n{plan.text.strip()}"[:2000],
+            summary=_summary(task, plan.text),
             risks=risks,
             tokens_used=tokens,
             cost_usd=cost,

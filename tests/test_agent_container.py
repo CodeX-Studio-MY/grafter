@@ -103,7 +103,8 @@ def test_start_runs_agent_on_internal_net_behind_relay(
     assert "-p" not in agent and "--publish" not in agent  # nothing published from the agent
     for flag in ("--cap-drop ALL", "--security-opt no-new-privileges", "--memory 4g", "--cpus 2"):
         assert flag in " ".join(agent)
-    assert agent[agent.index("-e") + 1] == SESSION_KEY_ENV  # name only; value via env
+    envs = [agent[i + 1] for i, a in enumerate(agent) if a == "-e"]
+    assert envs == [SESSION_KEY_ENV, "LITELLM_LOCAL_MODEL_COST_MAP=True"]  # key: name only
     assert ep.session_key not in " ".join(agent)
     assert e[1]["key"] == ep.session_key  # the docker CLI got it through its environment
 
