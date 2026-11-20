@@ -98,10 +98,8 @@ def _db(cfg: Config) -> Check:
 
 def _engine(cfg: Config) -> Check:
     try:
-        engine = get_engine(cfg.engine)
-    except NotImplementedError as e:
-        return Check("engine", "fail", f"{e}; use engine: noop to exercise the pipeline")
-    except ValueError as e:
+        engine = get_engine(cfg.engine, cfg)
+    except (ValueError, ImportError, SecretError) as e:
         return Check("engine", "fail", str(e))
     return Check("engine", "ok", engine.name)
 

@@ -90,13 +90,35 @@ def test_refuses_docker_runner(tmp_path: Path, sandbox_origin: Path) -> None:
     assert not (tmp_path / "home").exists()
 
 
-def test_refuses_openhands_and_unknown_engine(tmp_path: Path, sandbox_origin: Path) -> None:
+def test_refuses_openhands_with_local_runner(tmp_path: Path, sandbox_origin: Path) -> None:
     cfg = write_cfg(tmp_path, sandbox_origin, engine="openhands")
     result = invoke("run", "--dry-run", "--config", str(cfg))
     assert result.exit_code == 2
-    assert "engine 'openhands' lands in 1C3; use engine: noop" in result.output
+    assert "engine: openhands with runner: local would run agent-written tests" in result.output
+    assert not (tmp_path / "home").exists()
+
+
+def test_unknown_engine_exit_2(tmp_path: Path, sandbox_origin: Path) -> None:
     cfg = write_cfg(tmp_path, sandbox_origin, engine="nope")
-    assert invoke("run", "--dry-run", "--config", str(cfg)).exit_code == 2
+    result = invoke("run", "--dry-run", "--config", str(cfg), env=UNSAFE)
+    assert result.exit_code == 2 and "unknown engine" in result.output
+
+
+def test_openhands_without_master_key_exit_1(
+    tmp_path: Path, sandbox_origin: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import importlib.util
+
+    real_find = importlib.util.find_spec
+    monkeypatch.setattr(
+        importlib.util,
+        "find_spec",
+        lambda name, *a: object() if name == "openhands" else real_find(name, *a),
+    )
+    cfg = write_cfg(tmp_path, sandbox_origin, engine="openhands")
+    env = {"LITELLM_MASTER_KEY": "", "GRAFTER_LITELLM_MASTER_KEY": "", **UNSAFE}
+    result = invoke("run", "--dry-run", "--config", str(cfg), env=env)
+    assert result.exit_code == 1 and "LITELLM_MASTER_KEY is not set" in result.output
 
 
 def test_invalid_config_exit_1(tmp_path: Path) -> None:

@@ -200,6 +200,7 @@ def find_test_tasks(
             change_type=ChangeType.TEST,
             charter_ref=f"domain: {domain}",
             instruction=instruction,
+            target=target,
         )
         found.append(FoundTask(task=task, target=target, coverage=pct))
     return found

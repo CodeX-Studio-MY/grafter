@@ -51,6 +51,28 @@ _SECRET_ALLOW = frozenset({"token_budget_per_night"})
 _URL_USERINFO = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://[^/@]*@")
 
 
+# Agent-server image for SDK 1.60.1 (`1.60-python` index, built 2026-11-05T16:57Z; spike 1C2).
+# Bump together with the `openhands` extra in pyproject.toml and re-run the spike.
+OPENHANDS_IMAGE = (
+    "ghcr.io/openhands/agent-server@sha256:"
+    "b43ee580c2177280c81cb807c9a559d7a14aa13b48dba5040132a6a637bb6d55"
+)
+
+
+class OpenHands(BaseModel):
+    """`engine: openhands` settings (TODO 1C3). The container reaches the gateway at
+    `gateway_url` over `network`; it never sees the master or provider key."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    image: str = Field(default=OPENHANDS_IMAGE, min_length=1)
+    network: str = Field(default="grafter-gw", min_length=1)
+    gateway_url: str = Field(default="http://litellm:4000", min_length=1)
+    max_iterations: int = Field(default=60, ge=1, le=500)
+    timeout_s: int = Field(default=1800, ge=60)
+    plan_max_output: int = Field(default=2000, ge=100)  # planner reply cap, in tokens
+
+
 class KillSwitch(BaseModel):
     """Stops all runs when the file exists or the env var is truthy."""
 
@@ -142,6 +164,7 @@ class Config(BaseModel):
     branches: Branches = Branches()
     limits: Limits = Limits()
     engine: str = "openhands"
+    openhands: OpenHands = OpenHands()
     tier0_auto_merge: bool = False
     llm_gateway_url: str = "http://localhost:4000"
     models: Models = Models()

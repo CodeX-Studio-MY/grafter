@@ -31,6 +31,7 @@ def render_report(summary: RunSummary, cfg: Config) -> str:
         f"- Stopped: {_cell(summary.stopped_reason)}",
         f"- PRs opened: {len(real)} (limit {cfg.limits.max_prs_per_night})",
         f"- Tokens: {summary.tokens:,} (budget {cfg.limits.token_budget_per_night:,})",
+        f"- Cost: ${summary.cost_usd:.2f} (budget ${cfg.limits.usd_budget_per_night:.2f})",
         "- Cost: not tracked yet (gateway spend lands with 1C3)",
         f"- Repos: {', '.join(r.name for r in cfg.repos)}",
         "",

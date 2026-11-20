@@ -41,6 +41,7 @@ NOTE_MAX = 2000
 STOP_DONE = "completed"
 STOP_MAX_PRS = "max_prs_per_night reached"
 STOP_BUDGET = "token budget reached"
+STOP_USD = "USD budget reached"
 STOP_KILL = "kill switch engaged"
 
 _USERINFO = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*://)[^/@]*@")
@@ -79,6 +80,7 @@ class RunSummary:
     rejected: list[dict[str, Any]] = field(default_factory=list)
     skipped: list[dict[str, Any]] = field(default_factory=list)
     tokens: int = 0
+    cost_usd: float = 0.0  # gateway spend reported by the engine, summed per task
     stopped_reason: str = ""
     errors: list[dict[str, Any]] = field(default_factory=list)  # repo-level failures
     report_path: str = ""
@@ -166,7 +168,7 @@ def run_night(cfg: Config, deps: RunDeps, dry_run: bool, run_id: str | None = No
                     summary.stopped_reason = "interrupted"
                 opened = 0 if dry_run else len(summary.prs)
                 store.finish_run(
-                    run_id, status, opened, summary.tokens, 0.0, summary.stopped_reason
+                    run_id, status, opened, summary.tokens, summary.cost_usd, summary.stopped_reason
                 )
                 report = log.run_dir / REPORT_FILE
                 with report.open("w", encoding="utf-8", newline="\n") as fh:
@@ -181,6 +183,7 @@ def run_night(cfg: Config, deps: RunDeps, dry_run: bool, run_id: str | None = No
                     rejected=len(summary.rejected),
                     skipped=len(summary.skipped),
                     tokens=summary.tokens,
+                    cost_usd=round(summary.cost_usd, 4),
                 )
     return summary
 
@@ -267,6 +270,8 @@ class _Night:
             s.stopped_reason = STOP_MAX_PRS
         elif s.tokens >= limits.token_budget_per_night:
             s.stopped_reason = STOP_BUDGET
+        elif s.cost_usd >= limits.usd_budget_per_night:
+            s.stopped_reason = STOP_USD
         else:
             return False
         self.log.event("run_stopping", reason=s.stopped_reason)
@@ -361,12 +366,14 @@ class _Night:
             engine = self.deps.engine(found)
             result = engine.run(task, git.path, charter)
             self.summary.tokens += max(result.tokens_used, 0)
+            self.summary.cost_usd += max(result.cost_usd, 0.0)
             log.event(
                 "engine_finished",
                 **entry,
                 engine=engine.name,
                 success=result.success,
                 tokens=result.tokens_used,
+                cost_usd=result.cost_usd,
                 claimed_files=result.changed_files,
             )
 
@@ -395,6 +402,7 @@ class _Night:
                 summary=result.summary,
                 risks=result.risks,
                 tokens_used=result.tokens_used,
+                cost_usd=result.cost_usd,
             )
             store.set_status(change_id, ChangeStatus.TESTING, ACTOR)
             log.event(
@@ -463,7 +471,7 @@ class _Night:
                 coverage_after=gates.coverage_after,
                 risks=result.risks,
                 tokens=result.tokens_used,
-                cost_usd=0.0,
+                cost_usd=result.cost_usd,
                 fingerprint=fp,
             )
             pr_entry = {**entry, "title": draft.title, "tier": int(verdict.tier)}

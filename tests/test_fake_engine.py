@@ -77,10 +77,8 @@ def test_noop_engine_changes_nothing(tmp_path: Path) -> None:
     assert [p.name for p in tmp_path.iterdir()] == ["a.txt"]
 
 
-def test_get_engine_openhands_not_implemented_and_unknown() -> None:
+def test_get_engine_unknown() -> None:
     from grafter.engines import get_engine
 
-    with pytest.raises(NotImplementedError, match="1C3"):
-        get_engine("openhands")
     with pytest.raises(ValueError, match="unknown engine"):
         get_engine("nope")
