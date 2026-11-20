@@ -87,11 +87,13 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
   - [ ] **1C1b** 🧑 Build it and run the sandbox repo's tests inside it (`--network none`, or `grafter-gw` only). Done when: container runs the repo's tests. Needs a running Docker engine.
 - [ ] **1C2** Spike: OpenHands Software Agent SDK + DockerWorkspace hello-world (MIT packages only; verify licence; update `THIRD_PARTY.md`). Done when: agent edits a file inside the container.
 - [ ] **1C3** `OpenHandsEngine.run`: two steps (D15): `models.planner` writes a plan from task + charter + `AGENTS.md` + rules, then `models.coder` executes it; returns `RunResult` (changed files, summary, risks, tokens); token budget enforced. Done when: test with fake LLM + one real run on the sandbox repo.
-- [ ] **1C4** Fake engine for tests (deterministic diff). Done when: full pipeline test runs offline in CI.
+- [x] **1C4** Fake engine for tests (deterministic diff). Done when: full pipeline test runs offline in CI.
 
 ### 1D Work finding + pipeline
-- [ ] **1D1** Task finder for `test` type: coverage in sandbox → lowest-covered files outside protected paths, each citing a charter domain. Done when: prints ranked tasks for the sandbox repo.
-- [ ] **1D2** Verification gates after the engine: full suite passes in a fresh container; overall coverage did not drop and the target file improved; `guard.check` passes. Failures are recorded as rejected with a reason, no PR. Done when: tests.
+- [x] **1D1** Task finder for `test` type: coverage in sandbox → lowest-covered files outside protected paths, each citing a charter domain. Done when: prints ranked tasks for the sandbox repo.
+- [ ] **1D2** Verification gates after the engine, split:
+  - [x] **1D2a** `gates.run_gates`: suite passes, overall coverage did not drop, target file improved; failures carry a reason. Runs through a `CommandRunner` (`LocalRunner` for tests). Done when: tests on real pytest runs against the sandbox template.
+  - [ ] **1D2b** Docker `CommandRunner` so gates run in a fresh sandbox container (needs 1C1b). Never run repo commands on the host in real runs. Done when: gates pass/fail the same way inside the container.
 - [ ] **1D3** `grafter run`: lock → kill switch → find → engine → gates → guard → branch/commit/push/PR → record; stop at `max_prs_per_night` or budget. `--dry-run` skips push/PR. Done when: dry-run, then a real run on the sandbox repo opens ≤ N PRs.
 - [ ] **1D4** Nightly run report (PRs opened, rejections + reasons, tokens, cost) as a markdown file and an issue comment. Done when: report exists after a run.
 - [ ] **1D5** Nightly schedule, split:

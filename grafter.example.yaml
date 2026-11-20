@@ -5,7 +5,9 @@ repos:                    # one entry per repo of the solution (fictional exampl
     default_branch: main
     language: dotnet      # free text: dotnet, node, flutter, python, ...
     test_command: dotnet test
-    coverage_command: dotnet test --collect:"XPlat Code Coverage"
+    coverage_command: dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=lcov /p:CoverletOutput=../coverage/
+    coverage_report: coverage/coverage.info   # repo-relative file coverage_command writes
+    coverage_format: lcov  # lcov or coverage-json (coverage.py `--cov-report=json`)
     test_paths:           # globs; a `test` change may touch only these
       - tests/**
       - "**/*.Tests/**"
@@ -15,6 +17,8 @@ repos:                    # one entry per repo of the solution (fictional exampl
     language: node
     test_command: npm test
     coverage_command: npm run test:coverage
+    coverage_report: coverage/lcov.info
+    coverage_format: lcov
     test_paths:
       - "**/*.test.ts"
       - "**/*.test.tsx"
@@ -25,6 +29,8 @@ repos:                    # one entry per repo of the solution (fictional exampl
     language: flutter
     test_command: flutter test
     coverage_command: flutter test --coverage
+    coverage_report: coverage/lcov.info
+    coverage_format: lcov
     test_paths:
       - test/**
       - integration_test/**
