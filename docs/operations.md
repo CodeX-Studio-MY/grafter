@@ -2,7 +2,7 @@
 
 How to install and run Grafter on its host. **Draft (TODO 1F3a):** it gets finished and tested on a fresh VM in 1F3b.
 
-**Pending:** 1D2c, which limits the agent container to the gateway. Until it lands, `engine: openhands` is **dry-run only** (`grafter run` exits 2 on a real run with it). `runner: local` is refused for any real engine and for any real run. The OpenHands engine needs `pip install grafter[openhands]` and `LITELLM_MASTER_KEY`.
+`engine: openhands` needs `pip install grafter[openhands]`, `LITELLM_MASTER_KEY`, the agent image (`scripts/build-sandbox.sh agent-python`) and an internal `grafter-gw` network (from `deploy/litellm`). `runner: local` is refused for any real engine and for any real run.
 
 ## 1. Host (TODO 0D1)
 
@@ -45,7 +45,8 @@ grafter gateway check --config ~/.grafter/grafter.yaml
 ## 5. Sandbox image (TODO 1C1b, 1D2b)
 
 ```bash
-/opt/grafter/src/scripts/build-sandbox.sh python
+/opt/grafter/src/scripts/build-sandbox.sh python          # gates (runner: docker)
+/opt/grafter/src/scripts/build-sandbox.sh agent-python    # agent (engine: openhands)
 ```
 
 The image has no secrets and runs as a non-root user. With `runner: docker` (the default), every repo command Grafter runs goes into a **new container from this image**: the baseline coverage, the test suite, and the coverage after the change.

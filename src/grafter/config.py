@@ -51,12 +51,10 @@ _SECRET_ALLOW = frozenset({"token_budget_per_night"})
 _URL_USERINFO = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://[^/@]*@")
 
 
-# Agent-server image for SDK 1.60.1 (`1.60-python` index, built 2026-11-05T16:57Z; spike 1C2).
-# Bump together with the `openhands` extra in pyproject.toml and re-run the spike.
-OPENHANDS_IMAGE = (
-    "ghcr.io/openhands/agent-server@sha256:"
-    "b43ee580c2177280c81cb807c9a559d7a14aa13b48dba5040132a6a637bb6d55"
-)
+# Agent sandbox image (TODO 1D2c): the OpenHands agent server pinned by digest (SDK 1.60.1,
+# spike 1C2) plus test tools; built by `scripts/build-sandbox.sh agent-python` from
+# sandboxes/agent-python/Dockerfile. Bump its FROM together with the `openhands` extra.
+OPENHANDS_IMAGE = "grafter-sandbox-agent-python:latest"
 
 
 class OpenHands(BaseModel):
@@ -71,6 +69,11 @@ class OpenHands(BaseModel):
     max_iterations: int = Field(default=60, ge=1, le=500)
     timeout_s: int = Field(default=1800, ge=60)
     plan_max_output: int = Field(default=2000, ge=100)  # planner reply cap, in tokens
+    # 1D2c: the agent server sits only on the internal `network`; this relay publishes it.
+    relay_image: str = Field(default="python:3.12.15-slim-bookworm", min_length=1)
+    memory: str = Field(default="4g", min_length=1)
+    cpus: str = Field(default="2", min_length=1)
+    health_timeout_s: int = Field(default=120, ge=5)
 
 
 class KillSwitch(BaseModel):

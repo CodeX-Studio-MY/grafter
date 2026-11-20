@@ -117,7 +117,35 @@ def test_openhands_engine_fails(tmp_path: Path) -> None:
     cfg = write_cfg(tmp_path, engine="openhands", runner="local")
     result = CliRunner().invoke(app, ["doctor", "--config", str(cfg)], env=NO_SECRET)
     assert result.exit_code == 1
-    assert "1 check(s) failed: engine" in result.output
+    failed = result.output.strip().splitlines()[-1]
+    assert failed.startswith(("1 check(s) failed:", "2 check(s) failed:"))
+    assert "engine" in failed and "agent network" in result.output
+
+
+def test_agent_network_must_be_internal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = _cfg_obj(tmp_path, engine="openhands")
+    reply: dict[str, Any] = {"rc": 0, "out": "true\n"}
+
+    def fake_run(args: list[str], **kw: Any) -> subprocess.CompletedProcess[str]:
+        if args[1:3] == ["image", "inspect"]:
+            assert args[-1] == "grafter-sandbox-agent-python:latest"
+            return subprocess.CompletedProcess(args, reply.get("img", 0), "sha", "")
+        assert args[1:4] == ["network", "inspect", "grafter-gw"]
+        return subprocess.CompletedProcess(args, reply["rc"], reply["out"], "")
+
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: "/usr/bin/docker")
+    monkeypatch.setattr(doctor.subprocess, "run", fake_run)
+    assert doctor._agent_network(cfg).status == "ok"
+    reply["img"] = 1
+    assert "build with scripts/build-sandbox.sh agent-python" in doctor._agent_network(cfg).detail
+    reply["img"] = 0
+    reply["out"] = "false\n"
+    bad = doctor._agent_network(cfg)
+    assert bad.status == "fail" and "not internal" in bad.detail
+    reply["rc"] = 1
+    assert "not found" in doctor._agent_network(cfg).detail
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: None)
+    assert doctor._agent_network(cfg).detail == "docker: not on PATH"
 
 
 def _cfg_obj(tmp_path: Path, **overrides: Any) -> Any:

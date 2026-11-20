@@ -38,8 +38,9 @@ services:
 
 networks:
   gateway: {}
-  grafter-gw:                  # sandboxes join this network to reach the gateway (1C1)
+  grafter-gw:                  # agent containers reach the gateway here, and nothing else (1D2c)
     name: grafter-gw
+    internal: true             # no route out; LiteLLM reaches the provider via `gateway`
 
 volumes:
   litellm-db: {}

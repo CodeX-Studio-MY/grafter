@@ -104,12 +104,20 @@ def test_docker_runner_is_used(
     assert runner.image == "grafter-sandbox-python:latest"
 
 
-def test_openhands_real_run_refused_until_1d2c(tmp_path: Path, sandbox_origin: Path) -> None:
+def test_openhands_real_run_allowed_with_docker(
+    tmp_path: Path, sandbox_origin: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """1D2c done: no policy refusal any more; the next gate is the engine itself."""
+    from grafter import cli
+
+    def no_engine(cfg: Any) -> Any:
+        raise cli._fail("engine stub reached", 2)
+
+    monkeypatch.setattr(cli, "_engine", no_engine)
     cfg = write_cfg(tmp_path, sandbox_origin, runner="docker", engine="openhands")
     result = invoke("run", "--config", str(cfg))
     assert result.exit_code == 2
-    assert "dry-run only until 1D2c" in result.output
-    assert not (tmp_path / "home").exists()
+    assert "engine stub reached" in result.output and "1D2c" not in result.output
 
 
 def test_refuses_openhands_with_local_runner(tmp_path: Path, sandbox_origin: Path) -> None:

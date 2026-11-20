@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from grafter.config import OpenHands
+from grafter.engines.agent_container import AgentContainer
 from grafter.engines.openhands import (
     AgentLimits,
     AgentOutcome,
@@ -108,13 +109,19 @@ def _metrics_into(conv: Any, outcome: AgentOutcome) -> None:
 
 
 def sandbox_factory(settings: OpenHands) -> SandboxFactory:
+    """Agent server on the internal network behind the relay (1D2c), driven over HTTP."""
+
     @contextmanager
     def open_sandbox() -> Iterator[Sandbox]:
-        from openhands.workspace import DockerWorkspace
+        from openhands.sdk.workspace import RemoteWorkspace
 
-        with DockerWorkspace(
-            server_image=settings.image, network=settings.network, detach_logs=False
-        ) as ws:
-            yield SdkSandbox(ws)
+        with AgentContainer(settings).start() as ep:
+            ws = RemoteWorkspace(host=ep.url, api_key=ep.session_key, working_dir="/workspace")
+            try:
+                yield SdkSandbox(ws)
+            finally:
+                close = getattr(ws, "close", None)
+                if callable(close):
+                    close()
 
     return open_sandbox
