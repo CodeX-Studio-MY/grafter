@@ -1,5 +1,5 @@
 # Grafter config for the fictional sandbox repo (TODO 0D5). Copy to ~/.grafter/grafter.yaml
-# on the VM and replace OWNER. Secrets come from env vars, never from this file.
+# on the VM, replace OWNER and fill in github_app (0D2: the App page and installation URL). Secrets come from env vars, never from this file.
 repos:
   - name: api
     github: OWNER/grafter-sandbox
@@ -11,7 +11,7 @@ repos:
     coverage_format: coverage-json
     test_paths:
       - tests/**
-    sandbox_image: python:3.12-slim
+    # sandbox_image: empty = grafter-sandbox-python:latest (scripts/build-sandbox.sh python)
 limits:
   max_prs_per_night: 1
   usd_budget_per_night: 5.0

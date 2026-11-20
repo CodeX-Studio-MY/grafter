@@ -27,7 +27,7 @@ python3.12 -m venv /opt/grafter/.venv
 |---|---|---|
 | `~/.grafter/grafter.yaml` | 0644 | Config, ids only. Start from `deploy/grafter.sandbox.yaml`. Grafter rejects secret-looking keys. |
 | `~/.grafter/env` | **0600** | `LITELLM_MASTER_KEY`, `GRAFTER_GITHUB_APP_PRIVATE_KEY_FILE=/home/grafter/.grafter/app.pem`, `DOCKER_HOST` |
-| `~/.grafter/app.pem` | **0600** | GitHub App private key (0D2). Never inside a git repo; Grafter refuses one that is. |
+| `~/.grafter/app.pem` | **0600** | GitHub App private key (0D2). Never inside a git repo; Grafter refuses one that is. To move it from a workstation: copy it to the VM, then delete the workstation copy, or generate a new key in the App settings and delete the old one. |
 
 ```bash
 grafter validate /path/to/solution/grafter.charter.yaml --config ~/.grafter/grafter.yaml

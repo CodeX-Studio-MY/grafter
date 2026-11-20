@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Create the private GitHub repo <owner>/grafter-sandbox from examples/sandbox-repo (TODO 0D5b).
+# Create the GitHub repo <owner>/grafter-sandbox from examples/sandbox-repo (TODO 0D5b).
+# Private by default. Rulesets on private repos need a paid plan; on a free org, make it public
+# (content is fictional): gh repo edit <owner>/grafter-sandbox --visibility public (D19).
 # Usage: scripts/create-sandbox-repo.sh <owner>
 set -euo pipefail
 
