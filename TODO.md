@@ -48,14 +48,16 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 
 ### 0D Infrastructure
 - [ ] **0D1** 🧑 Provision Linux VM (Ubuntu LTS): rootless Docker, Python 3.12, git, non-root `grafter` user; nightly backup of the SQLite file (D17).
-- [ ] **0D2** 🧑 Create GitHub App: contents RW, pull requests RW, issues RW, checks R, metadata R. Install on pilot + sandbox repos only. Private key on the VM (mode 0600), never in git.
+- [ ] **0D2** GitHub App, split:
+  - [x] **0D2a** Create the App (org-owned, contents RW, pull requests RW, issues RW, checks R, metadata R; no webhook, no workflows/administration) and install it on the sandbox repo only. Done when: permission audit passes and `grafter doctor` sees only the installed repos. (verified 2026-11-21: App grafter-codex-studio, audit PASS, #27)
+  - [ ] **0D2b** 🧑 Private key on the VM (`~/.grafter/app.pem`, mode 0600, never in git); delete the workstation copy or rotate the key (needs 0D1). Install on the pilot repos at 1F1. Done when: `grafter doctor` on the VM is green.
 - [ ] **0D3** 🧑 Ruleset on each pilot repo `main`: PR + 1 human approval + `test` check, no force push, App not in bypass list. App may push only to `ai/*`.
 - [ ] **0D4** LiteLLM gateway on the VM, split:
   - [x] **0D4a** `deploy/litellm/` compose (LiteLLM v1.108.1 + private Postgres, D18), model routes for `models.*` (D15), `GatewayClient` (per-run key with `max_budget` + `budget_duration`, D16) and `grafter gateway check`. Done when: tests against a fake gateway pass and `docker compose config` validates.
   - [ ] **0D4b** 🧑 `docker compose up -d` on the VM with a real `.env`. Done when: `grafter gateway check` prints ok.
-- [ ] **0D5** Fictional end-to-end test repo `grafter-sandbox`, split:
+- [x] **0D5** Fictional end-to-end test repo `grafter-sandbox`, split:
   - [x] **0D5a** Template in `examples/sandbox-repo/` (Python AcmeHarvest API, ~36% coverage, `test` CI job, charter protecting `invoices.py`), `deploy/grafter.sandbox.yaml` (dry run, 1 PR/night) and `scripts/create-sandbox-repo.sh`. Done when: Grafter CI keeps the template at 30–50% coverage and its charter validates against the config.
-  - [ ] **0D5b** 🧑 Run `scripts/create-sandbox-repo.sh <owner>`, install the App (0D2), add the `main` ruleset. Done when: repo exists, App installed, ruleset on. All phase-1 testing happens here before the pilot.
+  - [x] **0D5b** Run `scripts/create-sandbox-repo.sh <owner>`, install the App (0D2), add the `main` ruleset. Done when: repo exists, App installed, ruleset on. All phase-1 testing happens here before the pilot. (verified 2026-11-21: public per D19, App installed, ruleset 27747355; App push to main rejected GH013, #27)
 
 **Gate 0 → 1:** charter validated · coverage known · thresholds recorded · VM + App + rulesets live.
 
@@ -71,9 +73,9 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 
 ### 1B Git + GitHub
 - [x] **1B1** Git wrapper: clone/fetch into work dir, cut `ai/<id>` from fresh `main`, commit as Grafter, push. Hard check: never pushes a non-`ai/*` ref. Done when: integration test against a local bare repo.
-- [ ] **1B2** GitHub App auth, split:
+- [x] **1B2** GitHub App auth, split:
   - [x] **1B2a** `github.AppAuth`: RS256 JWT, installation token cached until 5 min before expiry. Done when: tests against a fake GitHub API verifying the JWT.
-  - [ ] **1B2b** 🧑 With the real App (0D2). Done when: `grafter doctor` lists repos it can see.
+  - [x] **1B2b** With the real App (0D2). Done when: `grafter doctor` lists repos it can see. (verified 2026-11-21: doctor: App sees CodeX-Studio-MY/grafter-sandbox)
 - [ ] **1B3** PR creation, split:
   - [x] **1B3a** `GitHubClient.create_pr` (head must be `ai/*`), `ensure_labels`, `prbody.render_pr` (charter citation, type, tier, tests, coverage delta, risks, tokens, cost, fingerprint marker). Done when: tests against a fake GitHub API.
   - [ ] **1B3b** 🧑 Done when: a PR opened on the sandbox repo.
