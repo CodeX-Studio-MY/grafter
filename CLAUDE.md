@@ -15,7 +15,8 @@ Open-source (MIT) AI maintainer embedded 1:1 into ONE software solution. Nightly
 - One TODO group per branch + PR (e.g. 0B1–0B2), one commit per item tagged `[<id>]`. Branch cut from `main`.
 - Tests first; `ruff check . && ruff format --check . && mypy && pytest -q` green.
 - Item's "Done when" check run; its output pasted in the PR body.
-- Box ticked in `TODO.md` in the same PR. Never tick an unverified item.
+- Feature PRs never edit `TODO.md`; the PR body lists the items it completes with each one's Done-when output.
+- After merge, a `status/<date>` PR ticks those boxes (source PR noted, e.g. `(#17)`) and splits items. Never tick an unverified item.
 - 🧑 items: prepare everything possible, then tell the user exactly what to do.
 - ⚖️ items: present options + a recommendation; record the decision in `docs/decisions.md`.
 
