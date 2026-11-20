@@ -70,6 +70,11 @@ class RunDeps:
     origin_url: Callable[[RepoConfig], str]
     environ: Mapping[str, str] | None = None
     today: Callable[[], date] = date.today
+    # Per-repo runner (DockerRunner picks the repo's sandbox image); default: `runner`.
+    runner_for: Callable[[RepoConfig], CommandRunner] | None = None
+
+    def runner_of(self, repo: RepoConfig) -> CommandRunner:
+        return self.runner_for(repo) if self.runner_for else self.runner
 
 
 @dataclass
@@ -245,7 +250,7 @@ class _Night:
 
     def _repo(self, repo: RepoConfig, git: GitRepo, charter: Charter) -> None:
         self._fresh(git, repo, SCRATCH_BRANCH)
-        baseline = measure_coverage(self.deps.runner, git.path, repo)
+        baseline = measure_coverage(self.deps.runner_of(repo), git.path, repo)
         found = find_test_tasks(
             repo, charter, baseline.files, limit=self.cfg.limits.max_prs_per_night + EXTRA_TASKS
         )
@@ -427,7 +432,7 @@ class _Night:
                 self._reject(change_id, entry, verdict.reasons)
                 return
 
-            gates = run_gates(self.deps.runner, git.path, repo, baseline, found.target)
+            gates = run_gates(self.deps.runner_of(repo), git.path, repo, baseline, found.target)
             test_results = {
                 "passed": gates.passed,
                 "tests": gates.tests_summary,

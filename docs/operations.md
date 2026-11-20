@@ -2,7 +2,7 @@
 
 How to install and run Grafter on its host. **Draft (TODO 1F3a):** it gets finished and tested on a fresh VM in 1F3b.
 
-**Pending:** `runner: docker` (TODO 1D2b). Until it lands, `grafter run` refuses `runner: docker` and also any real engine (`engine: openhands`) with `runner: local`, because the gates would run agent-written tests on the host. Both refusals exit 2. Only the offline smoke test (section 12) runs end to end. The OpenHands engine needs `pip install grafter[openhands]` and `LITELLM_MASTER_KEY`.
+**Pending:** 1D2c, which limits the agent container to the gateway. Until it lands, `engine: openhands` is **dry-run only** (`grafter run` exits 2 on a real run with it). `runner: local` is refused for any real engine and for any real run. The OpenHands engine needs `pip install grafter[openhands]` and `LITELLM_MASTER_KEY`.
 
 ## 1. Host (TODO 0D1)
 
@@ -42,13 +42,19 @@ set -a; . ~/.grafter/env; set +a
 grafter gateway check --config ~/.grafter/grafter.yaml
 ```
 
-## 5. Sandbox image (TODO 1C1b)
+## 5. Sandbox image (TODO 1C1b, 1D2b)
 
 ```bash
 /opt/grafter/src/scripts/build-sandbox.sh python
 ```
 
-The image has no secrets and runs as a non-root user. At run time it only gets the `grafter-gw` network to the gateway.
+The image has no secrets and runs as a non-root user. With `runner: docker` (the default), every repo command Grafter runs goes into a **new container from this image**: the baseline coverage, the test suite, and the coverage after the change.
+- **Network:** `--network none`. The gates never need the gateway.
+- **Privileges:** no capabilities, `no-new-privileges`, uid 10001.
+- **Limits:** 2 GB memory, 2 CPUs, 512 pids.
+- **No host mounts.** The work tree goes in as a tar on stdin. Only the coverage report is copied back. The container is removed afterwards.
+
+A repo can name its own image with `sandbox_image:`, for example one with its dependencies baked in, since the gates run offline. `grafter doctor` fails if an image is missing.
 
 ## 6. Database
 

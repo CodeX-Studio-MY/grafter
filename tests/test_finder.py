@@ -2,6 +2,7 @@
 
 import json
 import shutil
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -169,7 +170,9 @@ class StubRunner:
         self.result, self.write = result, write
         self.calls: list[str] = []
 
-    def run(self, cmd: str, cwd: Path, timeout: float = 900) -> CmdResult:
+    def run(
+        self, cmd: str, cwd: Path, timeout: float = 900, outputs: Sequence[str] = ()
+    ) -> CmdResult:
         self.calls.append(cmd)
         if self.write:
             self.write[0].write_text(self.write[1], encoding="utf-8")
