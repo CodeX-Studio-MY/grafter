@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import shutil
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -132,12 +132,14 @@ class CachingRunner:
         self.inner = inner or LocalRunner()
         self.report = report
 
-    def run(self, cmd: str, cwd: Path, timeout: float = 900) -> CmdResult:
+    def run(
+        self, cmd: str, cwd: Path, timeout: float = 900, outputs: Sequence[str] = ()
+    ) -> CmdResult:
         key = (cmd, tree_hash(cwd))
         hit = _RUN_CACHE.get(key)
         report = cwd / self.report
         if hit is None:
-            res = self.inner.run(cmd, cwd, timeout)
+            res = self.inner.run(cmd, cwd, timeout, outputs)
             hit = (res, report.read_bytes() if report.is_file() else None)
             _RUN_CACHE[key] = hit
         elif hit[1] is not None:

@@ -114,12 +114,39 @@ def test_broken_config_exits_1(tmp_path: Path) -> None:
 
 
 def test_openhands_engine_fails(tmp_path: Path) -> None:
-    cfg = write_cfg(tmp_path, engine="openhands", runner="docker")
+    cfg = write_cfg(tmp_path, engine="openhands", runner="local")
     result = CliRunner().invoke(app, ["doctor", "--config", str(cfg)], env=NO_SECRET)
     assert result.exit_code == 1
     assert "1 check(s) failed: engine" in result.output
-    assert "docker runner lands in 1D2b" in result.output
-    assert "check(s) failed: engine" in result.output
+
+
+def _cfg_obj(tmp_path: Path, **overrides: Any) -> Any:
+    from grafter.config import load_config
+
+    return load_config(write_cfg(tmp_path, **overrides))
+
+
+def test_docker_runner_ok_and_missing_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg = _cfg_obj(tmp_path, runner="docker")
+    calls: list[list[str]] = []
+    present = {"ok": True}
+
+    def fake_run(args: list[str], **kw: Any) -> subprocess.CompletedProcess[bytes]:
+        calls.append(args)
+        return subprocess.CompletedProcess(args, 0 if present["ok"] else 1, b"sha", b"")
+
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: "/usr/bin/docker")
+    monkeypatch.setattr(doctor.subprocess, "run", fake_run)
+    ok = doctor._runner(cfg)
+    assert (ok.status, ok.detail) == ("ok", "docker: grafter-sandbox-python:latest")
+    assert calls[0][1:3] == ["image", "inspect"]
+    present["ok"] = False
+    bad = doctor._runner(cfg)
+    assert bad.status == "fail" and "build with scripts/build-sandbox.sh" in bad.detail
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: None)
+    assert doctor._runner(cfg).detail == "docker: not on PATH"
 
 
 def test_warnings_kill_switch_lock_gateway_docker(

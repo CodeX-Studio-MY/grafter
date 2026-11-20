@@ -21,7 +21,7 @@ from grafter.gateway import GatewayClient, GatewayError, redact
 from grafter.github import AppAuth, GitHubClient, app_auth
 from grafter.lock import KillSwitchEngaged, LockHeld
 from grafter.pipeline import RunDeps, run_night
-from grafter.runner import LocalRunner
+from grafter.runner import DockerRunner, LocalRunner, default_image
 from grafter.store import Store
 
 MASTER_KEY_ENV = "LITELLM_MASTER_KEY"
@@ -187,6 +187,14 @@ def _engine(cfg: Config) -> AgentEngine:
         raise _fail(f"engine {cfg.engine!r}: {e}", 1) from e
 
 
+def sandbox_image(repo: RepoConfig) -> str:
+    return repo.sandbox_image or default_image(repo.language)
+
+
+def docker_runner(repo: RepoConfig) -> DockerRunner:
+    return DockerRunner(sandbox_image(repo))
+
+
 def origin_url_for(auth: AppAuth | None) -> Callable[[RepoConfig], str]:
     def origin_url(repo: RepoConfig) -> str:
         if repo.clone_url:
@@ -208,19 +216,23 @@ def run(
     """Run one nightly cycle: find test work, build, verify, open PRs."""
     cfg = _load(config)
     dry = dry_run or cfg.dry_run
-    if cfg.runner == "docker":
-        raise _fail("docker runner lands in 1D2b; set runner: local only for offline testing", 2)
     unsafe_ok = os.environ.get(ALLOW_LOCAL_REAL_RUN_ENV) == "1"
-    if cfg.engine != "noop" and not unsafe_ok:
+    if cfg.runner == "local" and cfg.engine != "noop" and not unsafe_ok:
         raise _fail(
             f"engine: {cfg.engine} with runner: local would run agent-written tests on this "
-            "host in the gates, even in a dry run; it needs runner: docker (1D2b)",
+            "host in the gates, even in a dry run; use runner: docker",
             2,
         )
-    if not dry and not unsafe_ok:
+    if cfg.runner == "local" and not dry and not unsafe_ok:
         raise _fail(
             "runner: local is only allowed with --dry-run: a real run would execute "
-            "agent-written code on this host next to Grafter's secrets (wait for 1D2b)",
+            "repo code on this host next to Grafter's secrets; use runner: docker",
+            2,
+        )
+    if cfg.engine == "openhands" and not dry and not unsafe_ok:
+        raise _fail(
+            "engine: openhands is dry-run only until 1D2c: the agent container can still "
+            "reach the internet",
             2,
         )
     engine = _engine(cfg)
@@ -232,14 +244,16 @@ def run(
             raise _fail(f"GitHub App not usable for a real run: {e}", 1) from e
         typer.secho(f"note: GitHub App not used ({e}); cloning anonymously", err=True)
     github = None if dry or auth is None else GitHubClient(auth, api_url=cfg.github_app.api_url)
-    typer.secho(
-        "warning: runner local runs repo commands on this host (offline testing only)",
-        fg=typer.colors.YELLOW,
-        err=True,
-    )
+    if cfg.runner == "local":
+        typer.secho(
+            "warning: runner local runs repo commands on this host (offline testing only)",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
     deps = RunDeps(
         engine=lambda found: engine,
-        runner=LocalRunner(),
+        runner=LocalRunner() if cfg.runner == "local" else docker_runner(cfg.repos[0]),
+        runner_for=None if cfg.runner == "local" else docker_runner,
         github=github,
         origin_url=origin_url_for(auth),
     )

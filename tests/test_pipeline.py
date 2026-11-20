@@ -4,7 +4,7 @@ real pytest on the sandbox template, FakeEngine for the agent, a fake GitHub in-
 from __future__ import annotations
 
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -412,8 +412,10 @@ def test_pr_creation_failure_rejected_and_scrubbed(
 class StrayRunner(CachingRunner):
     """Coverage run leaves an untracked file behind (build output that is not gitignored)."""
 
-    def run(self, cmd: str, cwd: Path, timeout: float = 900) -> CmdResult:
-        res = super().run(cmd, cwd, timeout)
+    def run(
+        self, cmd: str, cwd: Path, timeout: float = 900, outputs: Sequence[str] = ()
+    ) -> CmdResult:
+        res = super().run(cmd, cwd, timeout, outputs)
         if "--cov" in cmd and (cwd / "tests/test_traceability.py").exists():
             (cwd / "stray.log").write_text("x\n", encoding="utf-8")
         return res

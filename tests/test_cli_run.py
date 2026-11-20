@@ -82,11 +82,33 @@ def test_config_dry_run_flag_is_honoured(tmp_path: Path, sandbox_origin: Path) -
     assert result.output.startswith("dry run ") or "\ndry run " in result.output
 
 
-def test_refuses_docker_runner(tmp_path: Path, sandbox_origin: Path) -> None:
+def test_docker_runner_is_used(
+    tmp_path: Path, sandbox_origin: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from grafter import cli
+    from grafter.pipeline import RunSummary
+
+    seen: dict[str, Any] = {}
+
+    def fake_run_night(cfg: Any, deps: Any, dry_run: bool) -> RunSummary:
+        seen["runner"] = deps.runner_of(cfg.repos[0])
+        return RunSummary(run_id="r", dry_run=dry_run, stopped_reason="completed")
+
+    monkeypatch.setattr(cli, "run_night", fake_run_night)
     cfg = write_cfg(tmp_path, sandbox_origin, runner="docker")
     result = invoke("run", "--dry-run", "--config", str(cfg))
+    assert result.exit_code == 0, result.output
+    assert "runner local" not in result.output
+    runner = seen["runner"]
+    assert isinstance(runner, cli.DockerRunner)
+    assert runner.image == "grafter-sandbox-python:latest"
+
+
+def test_openhands_real_run_refused_until_1d2c(tmp_path: Path, sandbox_origin: Path) -> None:
+    cfg = write_cfg(tmp_path, sandbox_origin, runner="docker", engine="openhands")
+    result = invoke("run", "--config", str(cfg))
     assert result.exit_code == 2
-    assert "docker runner lands in 1D2b" in result.output
+    assert "dry-run only until 1D2c" in result.output
     assert not (tmp_path / "home").exists()
 
 
