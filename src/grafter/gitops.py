@@ -180,6 +180,20 @@ class GitRepo:
                 stats.symlinks.append(path)
         return stats
 
+    # --- engine round trip -------------------------------------------------------------
+
+    def archive(self, dest: Path) -> Path:
+        """Write HEAD's tracked files as a .tar.gz (no .git, nothing untracked)."""
+        self.git("archive", "--format=tar.gz", "-o", str(dest), "HEAD")
+        return dest
+
+    def apply_patch(self, patch: Path) -> None:
+        """Apply a `git diff --binary` patch to the work tree. git refuses paths outside the
+        repo; symlinks and binaries come through so `diff_stats` can flag them."""
+        if patch.stat().st_size == 0:
+            return
+        self.git("apply", "--binary", "--whitespace=nowarn", str(patch.resolve()))
+
     # --- commit / push -----------------------------------------------------------------
 
     def commit(self, message: str, author_name: str, author_email: str) -> str:

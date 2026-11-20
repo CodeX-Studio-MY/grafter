@@ -582,3 +582,40 @@ def test_authed_restores_clean_origin(tmp_path: Path, git_isolation: None) -> No
     with pytest.raises(RuntimeError), authed(repo, url):
         raise RuntimeError("boom")
     assert git(repo.path, "remote", "get-url", "origin") == "https://github.com/o/r.git"
+
+
+class Costly:
+    """Wraps an engine factory and books `usd` per task, like the OpenHands engine does."""
+
+    def __init__(self, inner: Engines, usd: float) -> None:
+        self.inner, self.usd = inner, usd
+
+    def __call__(self, found: FoundTask) -> AgentEngine:
+        engine, usd = self.inner(found), self.usd
+
+        class Wrapped:
+            name = engine.name
+
+            def run(self, task: Task, workspace: Path, charter: Charter) -> RunResult:
+                result = engine.run(task, workspace, charter)
+                result.cost_usd = usd
+                return result
+
+        return Wrapped()
+
+
+def test_usd_budget_stops_run_and_cost_is_recorded(
+    make_cfg: Callable[..., Config], sandbox_origin: Path
+) -> None:
+    from grafter.pipeline import STOP_USD
+
+    cfg = make_cfg(limits={"max_prs_per_night": 3, "usd_budget_per_night": 0.5})
+    bad = {TRACE: {"src/acme_harvest/invoices.py": "# x\n"}}
+    engines = Engines(bad)
+    s = run_night(cfg, deps_for(sandbox_origin, Costly(engines, 0.5)), dry_run=True)
+    assert s.cost_usd == 0.5
+    assert s.stopped_reason == STOP_USD
+    assert engines.targets == [TRACE]
+    assert run_row(cfg, s.run_id)["cost_usd"] == 0.5
+    report = Path(s.report_path).read_text("utf-8")
+    assert "- Cost: $0.50 (budget $0.50)" in report

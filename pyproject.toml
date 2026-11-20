@@ -48,6 +48,10 @@ files = ["src"]
 python_version = "3.12"
 plugins = ["pydantic.mypy"]
 
+[[tool.mypy.overrides]]
+module = ["openhands.*"]  # optional extra; not installed in the dev venv
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
@@ -56,6 +60,8 @@ addopts = "--cov=grafter --cov-report=term-missing"
 [tool.coverage.run]
 source = ["grafter"]
 branch = true
+# Real OpenHands adapter: needs Docker + the gateway; exercised by spikes/engine_try.py.
+omit = ["*/grafter/engines/openhands_sdk.py"]
 
 [tool.coverage.report]
 fail_under = 75

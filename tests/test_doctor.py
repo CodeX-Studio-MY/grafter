@@ -117,7 +117,7 @@ def test_openhands_engine_fails(tmp_path: Path) -> None:
     cfg = write_cfg(tmp_path, engine="openhands", runner="docker")
     result = CliRunner().invoke(app, ["doctor", "--config", str(cfg)], env=NO_SECRET)
     assert result.exit_code == 1
-    assert "engine 'openhands' lands in 1C3; use engine: noop" in result.output
+    assert "1 check(s) failed: engine" in result.output
     assert "docker runner lands in 1D2b" in result.output
     assert "check(s) failed: engine" in result.output
 

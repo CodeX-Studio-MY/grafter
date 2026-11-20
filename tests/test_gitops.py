@@ -409,3 +409,86 @@ def test_git_error_message_tail() -> None:
     assert str(e).startswith("git x failed")
     assert str(e).endswith("last")
     assert len(e.stderr) <= 2000
+
+
+# --- archive / apply_patch (engine round trip, TODO 1C3a) ----------------------------
+
+
+def test_archive_holds_tracked_files_only(repo: GitRepo, tmp_path: Path) -> None:
+    import tarfile
+
+    put(repo.path / "untracked.txt", "x\n")
+    out = repo.archive(tmp_path / "repo.tgz")
+    with tarfile.open(out) as tar:
+        names = sorted(tar.getnames())
+    assert names == ["README.md", "app.py", "old.txt"]
+
+
+def make_patch(repo: GitRepo, tmp_path: Path, edit: object) -> Path:
+    """Patch produced the way the engine does it in the container: copy, edit, diff."""
+    other = tmp_path / "other"
+    git(tmp_path, "clone", "-q", str(repo.path), str(other))
+    assert callable(edit)
+    edit(other)
+    git(other, "add", "-A")
+    patch = tmp_path / "change.patch"
+    patch.write_bytes(
+        subprocess.run(
+            ["git", "-c", "core.autocrlf=false", "diff", "--cached", "--binary"],
+            cwd=other,
+            check=True,
+            capture_output=True,
+        ).stdout
+    )
+    return patch
+
+
+def test_apply_patch_add_change_delete(repo: GitRepo, tmp_path: Path) -> None:
+    def edit(d: Path) -> None:
+        (d / "tests").mkdir()
+        put(d / "tests" / "test_new.py", "def test_x() -> None:\n    assert True\n")
+        put(d / "app.py", "a = 1\nb = 3\n")
+        (d / "old.txt").unlink()
+
+    repo.apply_patch(make_patch(repo, tmp_path, edit))
+    stats = repo.diff_stats()
+    assert sorted(stats.changed_files) == ["app.py", "old.txt", "tests/test_new.py"]
+    assert stats.deleted_files == ["old.txt"]
+    assert (repo.path / "tests" / "test_new.py").read_bytes() == (
+        b"def test_x() -> None:\n    assert True\n"
+    )
+
+
+def test_apply_empty_patch_is_noop(repo: GitRepo, tmp_path: Path) -> None:
+    patch = tmp_path / "empty.patch"
+    patch.write_bytes(b"")
+    repo.apply_patch(patch)
+    assert repo.changed_files() == []
+
+
+def test_apply_patch_refuses_paths_outside_repo(repo: GitRepo, tmp_path: Path) -> None:
+    patch = tmp_path / "evil.patch"
+    patch.write_bytes(
+        b"diff --git a/../escape.txt b/../escape.txt\n"
+        b"new file mode 100644\n"
+        b"--- /dev/null\n"
+        b"+++ b/../escape.txt\n"
+        b"@@ -0,0 +1 @@\n"
+        b"+pwned\n"
+    )
+    with pytest.raises(GitError):
+        repo.apply_patch(patch)
+    assert not (tmp_path / "escape.txt").exists()
+    assert repo.changed_files() == []
+
+
+def test_apply_patch_keeps_symlink_for_guard(repo: GitRepo, tmp_path: Path) -> None:
+    def edit(d: Path) -> None:
+        os.symlink("README.md", d / "link")
+
+    try:
+        patch = make_patch(repo, tmp_path, edit)
+    except OSError:
+        pytest.skip("symlinks not permitted on this host")
+    repo.apply_patch(patch)
+    assert repo.diff_stats().symlinks == ["link"]

@@ -17,6 +17,7 @@ class Task:
     charter_ref: str
     instruction: str
     version_bump: Literal["patch", "minor", "major"] | None = None
+    target: str = ""  # repo-relative file the task is about, when there is one
 
 
 @dataclass
@@ -30,6 +31,7 @@ class RunResult:
     lines_removed: int = 0
     deleted_files: list[str] = field(default_factory=list)
     diff: str = ""
+    cost_usd: float = 0.0  # gateway spend for this task (D16), not an SDK estimate
 
 
 class AgentEngine(Protocol):

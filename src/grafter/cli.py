@@ -180,13 +180,11 @@ def _fail(message: str, code: int) -> typer.Exit:
 
 def _engine(cfg: Config) -> AgentEngine:
     try:
-        return get_engine(cfg.engine)
-    except NotImplementedError as e:
-        raise _fail(
-            f"engine {cfg.engine!r} lands in 1C3; use engine: noop to exercise the pipeline", 2
-        ) from e
-    except ValueError as e:
+        return get_engine(cfg.engine, cfg)
+    except (ValueError, ImportError) as e:
         raise _fail(str(e), 2) from e
+    except SecretError as e:
+        raise _fail(f"engine {cfg.engine!r}: {e}", 1) from e
 
 
 def origin_url_for(auth: AppAuth | None) -> Callable[[RepoConfig], str]:
@@ -212,7 +210,14 @@ def run(
     dry = dry_run or cfg.dry_run
     if cfg.runner == "docker":
         raise _fail("docker runner lands in 1D2b; set runner: local only for offline testing", 2)
-    if not dry and os.environ.get(ALLOW_LOCAL_REAL_RUN_ENV) != "1":
+    unsafe_ok = os.environ.get(ALLOW_LOCAL_REAL_RUN_ENV) == "1"
+    if cfg.engine != "noop" and not unsafe_ok:
+        raise _fail(
+            f"engine: {cfg.engine} with runner: local would run agent-written tests on this "
+            "host in the gates, even in a dry run; it needs runner: docker (1D2b)",
+            2,
+        )
+    if not dry and not unsafe_ok:
         raise _fail(
             "runner: local is only allowed with --dry-run: a real run would execute "
             "agent-written code on this host next to Grafter's secrets (wait for 1D2b)",

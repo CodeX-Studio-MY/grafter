@@ -53,3 +53,15 @@ class AgentEngine(Protocol):
 ```
 
 Default: OpenHands. Planned adapters: OpenCode, Claude Code, Codex CLI.
+
+### OpenHands engine (`engine: openhands`, TODO 1C3; spike: [docs/spikes/1C2-openhands.md](spikes/1C2-openhands.md))
+
+Each task works like this:
+
+1. **Run key.** One gateway run key is created for `[models.planner, models.coder]`. It is capped at `usd_budget_per_night / max_prs_per_night` and valid for 1 h, and it is always deleted at the end.
+2. **Planner.** One chat call made from the host with `models.planner`. Its input is the task, the charter (cited domain and invariants), the repo's `AGENTS.md`, the target file and its existing tests, each with a size cap. It returns a short test plan.
+3. **Coder.** An OpenHands agent running `models.coder` inside a fresh agent-server container (`openhands.image`, pinned by digest) on `openhands.network`. The work tree arrives as a `git archive`. The agent follows the plan and runs the repo's tests in the container. It works under limits on iterations, USD and tokens (`token_budget_per_night / max_prs_per_night`), plus a timeout.
+4. **Result.** Changed files that were all CRLF get CRLF again. The container's diff comes back as a patch and is applied on the host with `git apply`, which refuses paths outside the repo. Then the pipeline continues with the real diff stats, the guard and the gates.
+5. **Cost.** Cost is the gateway's spend for the run key. The pipeline adds it up, stores it per run and stops at `usd_budget_per_night`.
+
+Nothing the agent writes runs on the host. The container gets only the run key, never the master key or the Anthropic key. The gates do execute the new tests, so `grafter run` refuses `engine: openhands` with `runner: local` until the Docker runner exists (1D2b).
