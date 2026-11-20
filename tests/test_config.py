@@ -157,3 +157,64 @@ def test_usd_budget_must_be_positive(value: float) -> None:
 def test_old_single_model_field_rejected() -> None:
     with pytest.raises(ValidationError):
         Config.model_validate({**REPOS, "model": "claude-opus-5-5"})
+
+
+# --- run settings (1D3a) ---
+
+
+def test_run_settings_defaults() -> None:
+    c = Config.model_validate(REPOS)
+    assert c.charter_repo == ""
+    assert c.charter_file == "grafter.charter.yaml"
+    assert c.runner == "docker"
+    assert c.git_author_name == "Grafter"
+    assert c.git_author_email == "grafter-bot@users.noreply.github.com"
+    assert c.charter_repo_config().name == "api"
+    assert c.github_app.api_url == "https://api.github.com"
+    assert c.repos[0].clone_url == ""
+
+
+def test_charter_repo_must_be_configured() -> None:
+    with pytest.raises(ValidationError, match="charter_repo"):
+        Config.model_validate({**REPOS, "charter_repo": "web"})
+    two = {"repos": [*REPOS["repos"], {**REPOS["repos"][0], "name": "web", "github": "org/web"}]}
+    c = Config.model_validate({**two, "charter_repo": "web"})
+    assert c.charter_repo_config().name == "web"
+
+
+def test_runner_choices() -> None:
+    assert Config.model_validate({**REPOS, "runner": "local"}).runner == "local"
+    with pytest.raises(ValidationError):
+        Config.model_validate({**REPOS, "runner": "ssh"})
+
+
+@pytest.mark.parametrize("bad", ["", "../charter.yaml", "/etc/charter.yaml"])
+def test_charter_file_must_be_repo_relative(bad: str) -> None:
+    with pytest.raises(ValidationError):
+        Config.model_validate({**REPOS, "charter_file": bad})
+
+
+def test_charter_file_normalised() -> None:
+    c = Config.model_validate({**REPOS, "charter_file": r"./docs\grafter.charter.yaml"})
+    assert c.charter_file == "docs/grafter.charter.yaml"
+
+
+@pytest.mark.parametrize(
+    "url", ["https://user:pw@github.com/o/r.git", "https://x-access-token:abc@github.com/o/r"]
+)
+def test_clone_url_rejects_credentials(url: str) -> None:
+    repo = {**REPOS["repos"][0], "clone_url": url}
+    with pytest.raises(ValidationError, match="credentials"):
+        Config.model_validate({"repos": [repo]})
+
+
+def test_clone_url_accepts_path_or_plain_url() -> None:
+    for url in ("/srv/git/api.git", "C:/git/api.git", "https://github.com/o/r.git"):
+        repo = {**REPOS["repos"][0], "clone_url": url}
+        assert Config.model_validate({"repos": [repo]}).repos[0].clone_url == url
+
+
+def test_sandbox_config_runner_is_docker() -> None:
+    c = load_config(ROOT / "deploy/grafter.sandbox.yaml")
+    assert c.runner == "docker"
+    assert c.charter_repo_config().name == "api"

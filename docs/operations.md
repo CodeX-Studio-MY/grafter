@@ -1,6 +1,8 @@
 # Operations (draft)
 
-How to install and run Grafter on its host. **Draft (TODO 1F3a):** it gets finished and tested on a fresh VM in 1F3b. Commands marked *(phase 1, in progress)* don't exist yet.
+How to install and run Grafter on its host. **Draft (TODO 1F3a):** it gets finished and tested on a fresh VM in 1F3b.
+
+**Pending:** `runner: docker` (TODO 1D2b) and `engine: openhands` (TODO 1C3). Until they land, `grafter run` refuses both (exit 2); only the offline smoke test (section 12) runs end to end.
 
 ## 1. Host (TODO 0D1)
 
@@ -53,7 +55,7 @@ The image has no secrets and runs as a non-root user. At run time it only gets t
 SQLite at `~/.grafter/grafter.db` (D17).
 
 ```bash
-grafter db migrate --config ~/.grafter/grafter.yaml          # (phase 1, in progress)
+grafter db migrate --config ~/.grafter/grafter.yaml
 grafter db backup ~/.grafter/backups/grafter-$(date +%F).db --config ~/.grafter/grafter.yaml
 ```
 
@@ -72,13 +74,17 @@ journalctl -u grafter.service -n 200
 
 cron alternative: `crontab -u grafter /opt/grafter/src/deploy/cron/grafter.cron`.
 
-Start with `dry_run: true` and `max_prs_per_night: 1` for a few nights (1F1). Read the logs in `~/.grafter/runs/<run-id>/` before you turn dry run off.
+The timer runs `grafter run --config ~/.grafter/grafter.yaml`. Exit codes: 0 done, 1 failed or misconfigured, 2 runner/engine not available yet, 3 kill switch engaged, 4 another run holds the lock.
+
+Start with `dry_run: true` and `max_prs_per_night: 1` for a few nights (1F1). Each run writes `~/.grafter/runs/<run-id>/run.jsonl` (one JSON event per line) and `report.md` (PRs, rejections with reasons, skips, tokens). Read them before you turn dry run off.
 
 ## 8. Daily checks
 
 ```bash
-grafter doctor --config ~/.grafter/grafter.yaml               # (phase 1, in progress)
+grafter doctor --config ~/.grafter/grafter.yaml
 ```
+
+`doctor` prints `ok`, `warn` or `fail` per check (config, home, kill switch, lock, database, git, Docker, runner, engine, gateway, GitHub App and the repos it can see) and exits 1 if any check fails.
 
 Then review the night's PRs on GitHub. Approve, reject, or comment to ask for rework.
 
@@ -108,3 +114,31 @@ grafter db migrate --config ~/.grafter/grafter.yaml
 ```
 
 To upgrade the gateway, see its README.
+
+## 12. Offline smoke test
+
+Exercises the whole pipeline (lock, kill switch, charter, coverage, task finder, guard, store, run log, report) without GitHub, an LLM or Docker. `runner: local` runs the repo's commands **on this host**: use it only for testing, never for real runs.
+
+```bash
+git clone --bare https://github.com/<owner>/grafter-sandbox /tmp/sandbox.git   # or any local clone
+cat > /tmp/smoke.yaml <<'EOF'
+home: /tmp/grafter-smoke
+repos:
+  - name: api
+    github: OWNER/grafter-sandbox
+    clone_url: /tmp/sandbox.git        # offline only: clone from here, no token
+    language: python
+    test_command: pytest -q
+    coverage_command: pytest -q -p no:cacheprovider --cov --cov-report=json:coverage.json
+    coverage_report: coverage.json
+    test_paths: [tests/**]
+runner: local
+engine: noop                           # changes nothing: every task is rejected "engine made no changes"
+dry_run: true
+EOF
+grafter doctor --config /tmp/smoke.yaml
+grafter run --dry-run --config /tmp/smoke.yaml
+cat /tmp/grafter-smoke/runs/*/report.md
+```
+
+The run's Python needs `pytest` and `pytest-cov` (the sandbox repo's dev extras).

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
@@ -12,11 +13,20 @@ from pydantic import ValidationError
 
 from grafter import __version__
 from grafter.charter import load_charter
-from grafter.config import load_config
+from grafter.config import Config, RepoConfig, load_config
+from grafter.credentials import SecretError
+from grafter.doctor import run_checks
+from grafter.engines import AgentEngine, get_engine
 from grafter.gateway import GatewayClient, GatewayError, redact
+from grafter.github import AppAuth, GitHubClient, app_auth
+from grafter.lock import KillSwitchEngaged, LockHeld
+from grafter.pipeline import RunDeps, run_night
+from grafter.runner import LocalRunner
 from grafter.store import Store
 
 MASTER_KEY_ENV = "LITELLM_MASTER_KEY"
+# Test-only escape hatch: lets the offline suite exercise real-run wiring with runner: local.
+ALLOW_LOCAL_REAL_RUN_ENV = "GRAFTER_UNSAFE_ALLOW_LOCAL_REAL_RUN"
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -151,11 +161,128 @@ def db_backup(
     typer.secho(f"ok: backup written to {out}", fg=typer.colors.GREEN)
 
 
+EXIT_KILL_SWITCH = 3
+EXIT_LOCK_HELD = 4
+
+
+def _load(config: Path) -> Config:
+    try:
+        return load_config(config)
+    except (ValidationError, ValueError, FileNotFoundError) as e:
+        typer.secho(f"invalid config: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from e
+
+
+def _fail(message: str, code: int) -> typer.Exit:
+    typer.secho(message, fg=typer.colors.RED, err=True)
+    return typer.Exit(code)
+
+
+def _engine(cfg: Config) -> AgentEngine:
+    try:
+        return get_engine(cfg.engine)
+    except NotImplementedError as e:
+        raise _fail(
+            f"engine {cfg.engine!r} lands in 1C3; use engine: noop to exercise the pipeline", 2
+        ) from e
+    except ValueError as e:
+        raise _fail(str(e), 2) from e
+
+
+def origin_url_for(auth: AppAuth | None) -> Callable[[RepoConfig], str]:
+    def origin_url(repo: RepoConfig) -> str:
+        if repo.clone_url:
+            return repo.clone_url
+        if auth is None:
+            return f"https://github.com/{repo.github}.git"
+        return f"https://x-access-token:{auth.token()}@github.com/{repo.github}.git"
+
+    return origin_url
+
+
 @app.command()
-def run() -> None:
-    """Run one nightly cycle (phase 1)."""
-    typer.secho("not implemented yet: lands in phase 1", fg=typer.colors.YELLOW)
-    raise typer.Exit(2)
+def run(
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Do everything except push and open PRs.")
+    ] = False,
+    config: Annotated[Path, typer.Option("--config", help="grafter.yaml")] = Path("grafter.yaml"),
+) -> None:
+    """Run one nightly cycle: find test work, build, verify, open PRs."""
+    cfg = _load(config)
+    dry = dry_run or cfg.dry_run
+    if cfg.runner == "docker":
+        raise _fail("docker runner lands in 1D2b; set runner: local only for offline testing", 2)
+    if not dry and os.environ.get(ALLOW_LOCAL_REAL_RUN_ENV) != "1":
+        raise _fail(
+            "runner: local is only allowed with --dry-run: a real run would execute "
+            "agent-written code on this host next to Grafter's secrets (wait for 1D2b)",
+            2,
+        )
+    engine = _engine(cfg)
+    auth: AppAuth | None = None
+    try:
+        auth = app_auth(cfg)
+    except SecretError as e:
+        if not dry:
+            raise _fail(f"GitHub App not usable for a real run: {e}", 1) from e
+        typer.secho(f"note: GitHub App not used ({e}); cloning anonymously", err=True)
+    github = None if dry or auth is None else GitHubClient(auth, api_url=cfg.github_app.api_url)
+    typer.secho(
+        "warning: runner local runs repo commands on this host (offline testing only)",
+        fg=typer.colors.YELLOW,
+        err=True,
+    )
+    deps = RunDeps(
+        engine=lambda found: engine,
+        runner=LocalRunner(),
+        github=github,
+        origin_url=origin_url_for(auth),
+    )
+    try:
+        summary = run_night(cfg, deps, dry_run=dry)
+    except KillSwitchEngaged as e:
+        raise _fail(str(e), EXIT_KILL_SWITCH) from e
+    except LockHeld as e:
+        raise _fail(str(e), EXIT_LOCK_HELD) from e
+
+    mode = "dry run" if dry else "run"
+    typer.echo(
+        f"{mode} {summary.run_id}: {len(summary.prs)} PR(s){' (would open)' if dry else ''}, "
+        f"{len(summary.rejected)} rejected, {len(summary.skipped)} skipped, "
+        f"{summary.tokens} tokens; stopped: {summary.stopped_reason}"
+    )
+    for pr in summary.prs:
+        typer.echo(f"  PR {pr.get('url') or pr['branch']}: {pr['target']}")
+    for rej in summary.rejected:
+        typer.echo(f"  rejected {rej['target']}: {'; '.join(rej['reasons'])[:200]}")
+    for err in summary.errors:
+        typer.echo(f"  error {err['repo']}: {err['error'][:200]}")
+    typer.echo(f"report: {summary.report_path}")
+    if summary.kill_switch:
+        raise typer.Exit(EXIT_KILL_SWITCH)
+    if summary.failed:
+        raise typer.Exit(1)
+
+
+_STATUS_COLOR = {"ok": typer.colors.GREEN, "warn": typer.colors.YELLOW, "fail": typer.colors.RED}
+
+
+@app.command()
+def doctor(
+    config: Annotated[Path, typer.Option("--config", help="grafter.yaml")] = Path("grafter.yaml"),
+) -> None:
+    """Check this host: config, home, kill switch, lock, DB, git, Docker, engine, gateway, App."""
+    checks = run_checks(config)
+    width = max(len(c.name) for c in checks)
+    for c in checks:
+        status = typer.style(f"{c.status:<4}", fg=_STATUS_COLOR[c.status])
+        typer.echo(f"{status}  {c.name:<{width}}  {c.detail}")
+    failed = [c.name for c in checks if c.status == "fail"]
+    if failed:
+        typer.secho(f"{len(failed)} check(s) failed: {', '.join(failed)}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    warned = sum(c.status == "warn" for c in checks)
+    typer.secho(f"ok ({warned} warning(s))", fg=typer.colors.GREEN)
 
 
 if __name__ == "__main__":

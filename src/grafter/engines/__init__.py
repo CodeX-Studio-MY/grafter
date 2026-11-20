@@ -2,10 +2,16 @@ from grafter.engines.base import AgentEngine, RunResult, Task
 
 __all__ = ["AgentEngine", "RunResult", "Task", "get_engine"]
 
+ENGINES = ("noop", "openhands")
+
 
 def get_engine(name: str) -> AgentEngine:
-    if name == "openhands":
-        from grafter.engines.openhands import OpenHandsEngine
+    """The engine configured as `engine:`. Raises NotImplementedError for engines not built
+    yet and ValueError for unknown names."""
+    if name == "noop":
+        from grafter.engines.noop import NoopEngine
 
-        return OpenHandsEngine()
-    raise ValueError(f"unknown engine: {name}")
+        return NoopEngine()
+    if name == "openhands":
+        raise NotImplementedError("engine 'openhands' lands in 1C3")
+    raise ValueError(f"unknown engine: {name!r} (known: {', '.join(ENGINES)})")

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from grafter.charter import ChangeType, Charter, UnsafePathError
-from grafter.engines.base import AgentEngine, Task
+from grafter.engines.base import AgentEngine, RunResult, Task
 from grafter.engines.fake import FakeEngine
 
 CHARTER = Charter(
@@ -61,3 +61,26 @@ def test_refuses_unsafe_paths_before_writing(tmp_path: Path, bad: str) -> None:
 def test_is_an_agent_engine() -> None:
     eng: AgentEngine = FakeEngine({})
     assert eng.name == "fake"
+
+
+def test_noop_engine_changes_nothing(tmp_path: Path) -> None:
+    from grafter.engines import get_engine
+    from grafter.engines.noop import NoopEngine
+
+    engine = get_engine("noop")
+    assert isinstance(engine, NoopEngine) and engine.name == "noop"
+    (tmp_path / "a.txt").write_text("x", encoding="utf-8")
+    charter = Charter(solution="s", purpose="p", core_domains=["d"], allowed_change_types=["test"])
+    task = Task(id="t", repo="api", change_type=ChangeType.TEST, charter_ref="d", instruction="i")
+    r = engine.run(task, tmp_path, charter)
+    assert r == RunResult(success=False, summary="noop engine: no changes")
+    assert [p.name for p in tmp_path.iterdir()] == ["a.txt"]
+
+
+def test_get_engine_openhands_not_implemented_and_unknown() -> None:
+    from grafter.engines import get_engine
+
+    with pytest.raises(NotImplementedError, match="1C3"):
+        get_engine("openhands")
+    with pytest.raises(ValueError, match="unknown engine"):
+        get_engine("nope")

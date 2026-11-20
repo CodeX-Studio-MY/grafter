@@ -14,12 +14,14 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import datetime
 from typing import Any, Protocol
 
 import jwt as pyjwt
 
+from grafter.config import Config
+from grafter.credentials import SecretError, load_secret
 from grafter.prbody import marker
 
 API_URL = "https://api.github.com"
@@ -148,6 +150,19 @@ class AppAuth:
             raise GitHubError("unexpected installation token response: bad expires_at") from None
         self._token, self._expires_at = token, expires_at
         return token
+
+
+APP_KEY_SECRET = "GITHUB_APP_PRIVATE_KEY"
+
+
+def app_auth(cfg: Config, environ: Mapping[str, str] | None = None) -> AppAuth:
+    """AppAuth from the config ids and the `GITHUB_APP_PRIVATE_KEY` secret (env or file,
+    never inside the work dir). Raises SecretError when either is missing."""
+    ids = cfg.github_app
+    if ids.app_id is None or ids.installation_id is None:
+        raise SecretError("github_app.app_id and github_app.installation_id are not set")
+    key = load_secret(APP_KEY_SECRET, environ=environ, forbidden_dirs=[cfg.paths().work_dir])
+    return AppAuth(ids.app_id, ids.installation_id, key, api_url=ids.api_url)
 
 
 class TokenProvider(Protocol):

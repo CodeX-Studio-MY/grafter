@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import hashlib
 import re
 from dataclasses import dataclass, field
 
 from grafter.charter import ChangeType
 from grafter.engines.base import Task
+from grafter.finder import fingerprint
 from grafter.guard import Tier
 
 # Hidden line in every Grafter PR body; `GitHubClient.find_open_pr` matches it so a rerun
@@ -44,9 +44,9 @@ class PullRequestDraft:
 
 def fingerprint_for(task: Task, target: str) -> str:
     """Stable id of a change: same repo, change type and target -> same fingerprint,
-    whatever the task id or wording, so reruns find the PR already open."""
-    key = f"{task.repo}|{task.change_type.value}|{target}"
-    return hashlib.sha256(key.encode()).hexdigest()[:16]
+    whatever the task id or wording, so reruns find the PR already open.
+    Delegates to `finder.fingerprint`: one formula for task ids and PR markers."""
+    return fingerprint(task.repo, task.change_type, target)
 
 
 def marker(fingerprint: str) -> str:

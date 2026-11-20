@@ -11,5 +11,5 @@ echo "built $tag"
 cat <<NEXT
 Smoke test against the fictional sandbox repo (no network, read-only source copy):
   docker run --rm --network none -v "$root/examples/sandbox-repo:/src:ro" grafter-sandbox-$lang:latest \
-    sh -c 'cp -r /src/. /workspace && pip install --user -q -e . && python -m pytest -q --cov'
+    sh -c 'cp -r /src/. /workspace && python -m pytest -q -p no:cacheprovider --cov'
 NEXT
