@@ -88,8 +88,10 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [x] **1C1** Sandbox image for the sandbox repo, split:
   - [x] **1C1a** `sandboxes/python/Dockerfile` (`python:3.12.15-slim-bookworm`, non-root, no secrets) + `scripts/build-sandbox.sh`. Done when: files reviewed, script syntax-checked.
   - [x] **1C1b** Build it and run the sandbox repo's tests inside it (`--network none`, or `grafter-gw` only). Done when: container runs the repo's tests. Verified locally (Docker 29.9.3): 4 passed as uid 10001, 36% coverage, network blocked. (#17)
-- [ ] **1C2** Spike: OpenHands Software Agent SDK + DockerWorkspace hello-world (MIT packages only; verify licence; update `THIRD_PARTY.md`). Done when: agent edits a file inside the container.
-- [ ] **1C3** `OpenHandsEngine.run`: two steps (D15): `models.planner` writes a plan from task + charter + `AGENTS.md` + rules, then `models.coder` executes it; returns `RunResult` (changed files, summary, risks, tokens); token budget enforced. Done when: test with fake LLM + one real run on the sandbox repo.
+- [x] **1C2** Spike: OpenHands Software Agent SDK + DockerWorkspace hello-world (MIT packages only; verify licence; update `THIRD_PARTY.md`). Done when: agent edits a file inside the container. (#19)
+- [ ] **1C3** `OpenHandsEngine.run`: two steps (D15): `models.planner` writes a plan from task + charter + `AGENTS.md` + rules, then `models.coder` executes it; returns `RunResult` (changed files, summary, risks, tokens, cost); token budget enforced. Split:
+  - [ ] **1C3a** Engine with per-task gateway key, patch brought back and applied with `git apply`; nothing agent-written runs on the host. Done when: tests with fake LLM + fake sandbox, and one real engine run on the sandbox repo whose diff the guard allows.
+  - [ ] **1C3b** `grafter run` with `engine: openhands` (needs 1D2b so gates run in a container). Done when: a real run on the sandbox repo opens a PR.
 - [x] **1C4** Fake engine for tests (deterministic diff). Done when: full pipeline test runs offline in CI.
 
 ### 1D Work finding + pipeline
