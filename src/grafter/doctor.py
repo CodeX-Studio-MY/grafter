@@ -97,6 +97,44 @@ def _db(cfg: Config) -> Check:
     return Check("database", "ok", f"{path} at schema version {version}")
 
 
+def _agent_network(cfg: Config) -> Check:
+    """1D2c: the agent container's network must be internal (gateway only, no internet)."""
+    docker = shutil.which("docker")
+    if docker is None:
+        return Check("agent network", "fail", "docker: not on PATH")
+    net = cfg.openhands.network
+    proc = subprocess.run(
+        [docker, "network", "inspect", net, "--format", "{{.Internal}}"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return Check("agent network", "fail", f"{net} not found; start deploy/litellm")
+    if proc.stdout.strip() != "true":
+        return Check(
+            "agent network",
+            "fail",
+            f"{net} is not internal; recreate it: docker compose down && docker compose up -d",
+        )
+    image = cfg.openhands.image
+    img = subprocess.run(
+        [docker, "image", "inspect", "--format", "{{.Id}}", image],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    if img.returncode != 0:
+        return Check(
+            "agent network",
+            "fail",
+            f"agent image {image} missing; build with scripts/build-sandbox.sh agent-python",
+        )
+    return Check("agent network", "ok", f"{net}: internal (gateway only); image {image}")
+
+
 def _engine(cfg: Config) -> Check:
     try:
         engine = get_engine(cfg.engine, cfg)
@@ -179,4 +217,6 @@ def run_checks(config: Path, environ: Mapping[str, str] | None = None) -> list[C
     works, detail = docker_info()
     checks.append(Check("docker", "ok" if works else "warn", detail))
     checks += [_runner(cfg), _engine(cfg), _gateway(cfg), _github(cfg, environ)]
+    if cfg.engine == "openhands":
+        checks.append(_agent_network(cfg))
     return checks

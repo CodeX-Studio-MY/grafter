@@ -184,14 +184,14 @@ def test_run_applies_patch_and_reports_gateway_cost(
     # The sandbox got an archive, ran the agent with the run key only, and gave a patch back.
     assert box.opened == box.closed == 1
     kinds = [c[0] for c in box.calls]
-    assert kinds == ["upload", "execute", "execute", "agent", "execute", "execute", "download"]
-    assert "GRAFTER_EOL" in box.calls[4][1]
+    assert kinds == ["upload", "execute", "agent", "execute", "execute", "download"]
+    assert "GRAFTER_EOL" in box.calls[3][1]
     assert ARCHIVE_PATH in box.uploads and box.uploads[ARCHIVE_PATH][:2] == b"\x1f\x8b"
-    prompt, llm, limits = box.calls[3][1]
+    prompt, llm, limits = box.calls[2][1]
     assert llm == LlmSpec("litellm_proxy/claude-sonnet-5-5", "http://litellm:4000", RUN_KEY)
     assert limits == AgentLimits(60, 0.5, 25_000 - 1000, 1800.0)
     assert PLAN in prompt and "tests/**" in prompt
-    assert box.calls[6][1] == PATCH_PATH
+    assert box.calls[5][1] == PATCH_PATH
 
 
 def test_no_changes_is_success_with_empty_list(

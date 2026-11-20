@@ -39,5 +39,12 @@ The check calls the liveness probe and creates a key valid for 1 hour, capped at
 | Rotate Anthropic key | edit `.env`, `docker compose up -d` |
 
 Never change `LITELLM_SALT_KEY` after first start; it encrypts stored credentials.
-Port 4000 is bound to `127.0.0.1` only. Sandboxes reach the gateway over the `grafter-gw`
-Docker network (1C1).
+Port 4000 is bound to `127.0.0.1` only. Agent containers reach the gateway over the `grafter-gw`
+Docker network, which is `internal: true` (1D2c): it has no route out, so code the agent writes
+can reach LiteLLM and nothing else. LiteLLM itself reaches the provider through its other
+network, `gateway`.
+
+**Upgrading from before 1D2c:** an existing network can't be switched to internal in place.
+Run `docker compose down && docker compose up -d` once. Then
+`docker network inspect grafter-gw --format '{{.Internal}}'` must print `true`. The engine
+refuses to start an agent otherwise, and `grafter doctor` reports it.

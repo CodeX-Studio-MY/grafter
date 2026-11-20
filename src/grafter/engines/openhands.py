@@ -34,7 +34,6 @@ WORKDIR = "/workspace/project"
 PATCH_PATH = "/tmp/grafter.patch"
 ARCHIVE_PATH = "/tmp/grafter-repo.tgz"
 KEY_DURATION = "1h"
-SETUP_TIMEOUT_S = 600.0
 CMD_TIMEOUT_S = 120.0
 
 # Size caps for prompt parts (characters).
@@ -43,11 +42,6 @@ CAP_TARGET = 16_000
 CAP_TEST_FILE = 8_000
 CAP_TESTS_TOTAL = 24_000
 MAX_TEST_FILES = 4
-
-# Best-effort dependency install per language before the agent starts.
-SETUP = {
-    "python": "python -m pip install -q -e . pytest pytest-cov 2>&1 | tail -3 || true",
-}
 
 # Run in the repo (container) before taking the diff: a modified file that was all CRLF at
 # HEAD is made all CRLF again. Editors in the container write LF, which would otherwise
@@ -337,9 +331,6 @@ class OpenHandsEngine:
             )
             if prep.exit_code != 0:
                 raise RuntimeError(f"workspace setup failed: {prep.stdout[-300:]}")
-            setup = SETUP.get(repo.language)
-            if setup:
-                box.execute(f"cd {WORKDIR} && {setup}", SETUP_TIMEOUT_S)
             outcome = box.run_agent(coder_prompt(task, repo, plan), llm, limits)
             if outcome.status == "finished":
                 box.execute(f"cd {WORKDIR} && {KEEP_EOL_CMD}", CMD_TIMEOUT_S)

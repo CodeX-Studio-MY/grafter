@@ -229,12 +229,6 @@ def run(
             "repo code on this host next to Grafter's secrets; use runner: docker",
             2,
         )
-    if cfg.engine == "openhands" and not dry and not unsafe_ok:
-        raise _fail(
-            "engine: openhands is dry-run only until 1D2c: the agent container can still "
-            "reach the internet",
-            2,
-        )
     engine = _engine(cfg)
     auth: AppAuth | None = None
     try:

@@ -90,10 +90,10 @@ The agent added one test function, `test_grade_boundaries_and_validation`. It ch
 
 ## Recommendations for 1C3 and 1D2b
 
-1. **Restricting network access is still open, and must be solved before real runs (1D2b).**
-   - Candidate: put the agent-server on an `internal` network together with LiteLLM, and add a tiny relay container on both that network and a normal one. The relay publishes only the agent-server port to `127.0.0.1`. The agent then reaches only the gateway, and the host reaches only the agent server.
-   - Alternative: an egress proxy that only allows the gateway.
-   - Either way, build it in 1D2b and test it there.
+1. **Restricting network access: resolved in 1D2c**, with the relay design described here:
+   - `grafter-gw` is now `internal`. The agent server lives only on it, behind a relay that is hardened, read-only and runs only our code.
+   - Checked with `spikes/egress_check.py`: DNS and direct-IP connections to the internet fail, `litellm:4000` answers, and sudo is blocked by `no-new-privileges`.
+   - Because the agent has no internet, it can't `pip install`. Test tools come from the agent sandbox image (`sandboxes/agent-python`).
 2. **Image choice:** use the OpenHands agent-server image, pinned by digest, as the engine's sandbox.
    - Our `sandboxes/python` image stays the **gates** runner (1D2b): tests and coverage run in a fresh container that the agent never touched.
    - `DockerDevWorkspace` can build the agent server from a different base image, but it needs the SDK source tree. That isn't worth it for phase 1.
