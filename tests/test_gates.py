@@ -1,6 +1,7 @@
 """Verification gates (TODO 1D2), run for real on a copy of the sandbox repo."""
 
 import shutil
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -165,7 +166,9 @@ class StubRunner:
     def __init__(self, report: str | None, test_out: str = "", test_err: str = "") -> None:
         self.report, self.test_out, self.test_err = report, test_out, test_err
 
-    def run(self, cmd: str, cwd: Path, timeout: float = 900) -> CmdResult:
+    def run(
+        self, cmd: str, cwd: Path, timeout: float = 900, outputs: Sequence[str] = ()
+    ) -> CmdResult:
         if "--cov" in cmd:
             if self.report is not None:
                 (cwd / "coverage.json").write_text(self.report, encoding="utf-8")

@@ -111,7 +111,7 @@ def measure_coverage(
         raise CoverageError(f"repo {repo.name!r}: coverage_command and coverage_report needed")
     report = workdir / repo.coverage_report
     report.unlink(missing_ok=True)
-    res = runner.run(repo.coverage_command, workdir, timeout)
+    res = runner.run(repo.coverage_command, workdir, timeout, outputs=[repo.coverage_report])
     if res.exit_code != 0:
         tail = (res.stdout + res.stderr).strip()[-1000:]
         raise CoverageError(f"coverage command failed (exit {res.exit_code}): {tail}")

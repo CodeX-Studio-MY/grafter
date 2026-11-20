@@ -19,7 +19,9 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy
-      - run: pytest -q
+      - name: build the sandbox image (Docker runner tests need it, TODO 1D2b)
+        run: bash scripts/build-sandbox.sh python
+      - run: pytest -q -rs
       - run: grafter validate examples/acme-harvest/grafter.charter.yaml
       - name: sandbox template stays weakly tested (30-50% coverage)
         working-directory: examples/sandbox-repo

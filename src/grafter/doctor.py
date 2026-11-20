@@ -23,6 +23,7 @@ from grafter.engines import get_engine
 from grafter.gateway import GatewayClient, GatewayError
 from grafter.github import GitHubClient, GitHubError, app_auth
 from grafter.lock import pid_alive
+from grafter.runner import default_image
 from grafter.store import Store
 
 Status = Literal["ok", "warn", "fail"]
@@ -105,9 +106,32 @@ def _engine(cfg: Config) -> Check:
 
 
 def _runner(cfg: Config) -> Check:
-    if cfg.runner == "docker":
-        return Check("runner", "warn", "docker runner lands in 1D2b; grafter run refuses it")
-    return Check("runner", "warn", "local: repo commands run on this host (offline testing only)")
+    if cfg.runner == "local":
+        return Check(
+            "runner", "warn", "local: repo commands run on this host (offline testing only)"
+        )
+    docker = shutil.which("docker")
+    if docker is None:
+        return Check("runner", "fail", "docker: not on PATH")
+    images = sorted({r.sandbox_image or default_image(r.language) for r in cfg.repos})
+    missing = []
+    for image in images:
+        proc = subprocess.run(
+            [docker, "image", "inspect", "--format", "{{.Id}}", image],
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+        if proc.returncode != 0:
+            missing.append(image)
+    if missing:
+        return Check(
+            "runner",
+            "fail",
+            f"docker: sandbox image(s) missing: {', '.join(missing)}; "
+            "build with scripts/build-sandbox.sh <language>",
+        )
+    return Check("runner", "ok", f"docker: {', '.join(images)}")
 
 
 def _gateway(cfg: Config) -> Check:
