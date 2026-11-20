@@ -96,10 +96,10 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 
 ### 1D Work finding + pipeline
 - [x] **1D1** Task finder for `test` type: coverage in sandbox → lowest-covered files outside protected paths, each citing a charter domain. Done when: prints ranked tasks for the sandbox repo.
-- [ ] **1D2** Verification gates after the engine, split:
+- [x] **1D2** Verification gates after the engine, split:
   - [x] **1D2a** `gates.run_gates`: suite passes, overall coverage did not drop, target file improved; failures carry a reason. Runs through a `CommandRunner` (`LocalRunner` for tests). Done when: tests on real pytest runs against the sandbox template.
   - [x] **1D2b** Docker `CommandRunner` so gates run in a fresh sandbox container (needs 1C1b). Never run repo commands on the host in real runs. Done when: gates pass/fail the same way inside the container. (#23)
-  - [ ] **1D2c** Agent container reaches only the gateway (internal network + relay, spike 1C2). Real `grafter run` with `engine: openhands` stays refused until this is done. Done when: from inside the agent container the internet is blocked and the gateway is reachable, and an engine run still passes.
+  - [x] **1D2c** Agent container reaches only the gateway (internal network + relay, spike 1C2). Real `grafter run` with `engine: openhands` stays refused until this is done. Done when: from inside the agent container the internet is blocked and the gateway is reachable, and an engine run still passes. (#25)
 - [ ] **1D3** `grafter run`: lock → kill switch → find → engine → gates → guard → branch/commit/push/PR → record; stop at `max_prs_per_night` or budget. `--dry-run` skips push/PR. Split:
   - [x] **1D3a** Pipeline + CLI offline: local bare origin, fake engine, fake GitHub; ≤ N PRs, none on re-run, protected/skip edits rejected, kill switch + lock exit codes. Real runs refused with `runner: local`. Done when: offline end-to-end tests + `--dry-run`. (#17)
   - [ ] **1D3b** 🧑 Needs 1D2b, the App (0D2) and the sandbox repo. Done when: a real run on the sandbox repo opens ≤ N PRs.
