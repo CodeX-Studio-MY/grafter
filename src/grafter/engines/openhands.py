@@ -49,6 +49,26 @@ SETUP = {
     "python": "python -m pip install -q -e . pytest pytest-cov 2>&1 | tail -3 || true",
 }
 
+# Run in the repo (container) before taking the diff: a modified file that was all CRLF at
+# HEAD is made all CRLF again. Editors in the container write LF, which would otherwise
+# turn a small edit into a whole-file rewrite (and trip the guard's "removes tests" check).
+KEEP_EOL = r"""
+import subprocess
+out = subprocess.run(["git", "diff", "--name-only", "-z", "--diff-filter=M", "HEAD"],
+                     capture_output=True, check=True).stdout
+for name in filter(None, out.decode().split("\0")):
+    old = subprocess.run(["git", "show", "HEAD:" + name], capture_output=True, check=True).stdout
+    with open(name, "rb") as fh:
+        new = fh.read()
+    crlf_at_head = b"\n" in old and old.count(b"\n") == old.count(b"\r\n")
+    if crlf_at_head and b"\0" not in new:
+        fixed = new.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+        if fixed != new:
+            with open(name, "wb") as fh:
+                fh.write(fixed)
+""".strip()
+KEEP_EOL_CMD = f"python3 - <<'GRAFTER_EOL'\n{KEEP_EOL}\nGRAFTER_EOL"
+
 AgentStatus = Literal["finished", "token_cap", "error", "timeout"]
 
 
@@ -322,6 +342,7 @@ class OpenHandsEngine:
                 box.execute(f"cd {WORKDIR} && {setup}", SETUP_TIMEOUT_S)
             outcome = box.run_agent(coder_prompt(task, repo, plan), llm, limits)
             if outcome.status == "finished":
+                box.execute(f"cd {WORKDIR} && {KEEP_EOL_CMD}", CMD_TIMEOUT_S)
                 out = box.execute(
                     f"cd {WORKDIR} && git add -A && git diff --cached --binary > {PATCH_PATH}",
                     CMD_TIMEOUT_S,

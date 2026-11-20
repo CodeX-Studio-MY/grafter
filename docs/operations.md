@@ -2,7 +2,7 @@
 
 How to install and run Grafter on its host. **Draft (TODO 1F3a):** it gets finished and tested on a fresh VM in 1F3b.
 
-**Pending:** `runner: docker` (TODO 1D2b) and `engine: openhands` (TODO 1C3). Until they land, `grafter run` refuses both (exit 2); only the offline smoke test (section 12) runs end to end.
+**Pending:** `runner: docker` (TODO 1D2b). Until it lands, `grafter run` refuses `runner: docker` and also any real engine (`engine: openhands`) with `runner: local`, because the gates would run agent-written tests on the host. Both refusals exit 2. Only the offline smoke test (section 12) runs end to end. The OpenHands engine needs `pip install grafter[openhands]` and `LITELLM_MASTER_KEY`.
 
 ## 1. Host (TODO 0D1)
 

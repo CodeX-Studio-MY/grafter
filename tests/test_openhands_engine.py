@@ -18,6 +18,7 @@ from grafter.config import Config
 from grafter.engines.base import Task
 from grafter.engines.openhands import (
     ARCHIVE_PATH,
+    KEEP_EOL,
     PATCH_PATH,
     AgentLimits,
     AgentOutcome,
@@ -183,13 +184,14 @@ def test_run_applies_patch_and_reports_gateway_cost(
     # The sandbox got an archive, ran the agent with the run key only, and gave a patch back.
     assert box.opened == box.closed == 1
     kinds = [c[0] for c in box.calls]
-    assert kinds == ["upload", "execute", "execute", "agent", "execute", "download"]
+    assert kinds == ["upload", "execute", "execute", "agent", "execute", "execute", "download"]
+    assert "GRAFTER_EOL" in box.calls[4][1]
     assert ARCHIVE_PATH in box.uploads and box.uploads[ARCHIVE_PATH][:2] == b"\x1f\x8b"
     prompt, llm, limits = box.calls[3][1]
     assert llm == LlmSpec("litellm_proxy/claude-sonnet-5-5", "http://litellm:4000", RUN_KEY)
     assert limits == AgentLimits(60, 0.5, 25_000 - 1000, 1800.0)
     assert PLAN in prompt and "tests/**" in prompt
-    assert box.calls[5][1] == PATCH_PATH
+    assert box.calls[6][1] == PATCH_PATH
 
 
 def test_no_changes_is_success_with_empty_list(
@@ -392,3 +394,37 @@ def test_get_engine_openhands_without_extra(cfg: Config, monkeypatch: pytest.Mon
     )
     with pytest.raises(ImportError, match=r"grafter\[openhands\]"):
         get_engine("openhands", cfg)
+
+
+# --- line endings -------------------------------------------------------------------------
+
+
+def test_keep_eol_restores_crlf_on_modified_files_only(tmp_path: Path, git_isolation: None) -> None:
+    import sys
+
+    repo = tmp_path / "r"
+    repo.mkdir()
+    git(repo, "init", "-q")
+    (repo / "crlf.py").write_bytes(b"a = 1\r\nb = 2\r\n")
+    (repo / "lf.py").write_bytes(b"x = 1\n")
+    (repo / "still_crlf.py").write_bytes(b"keep\r\n")
+    git(repo, "add", "-A")
+    git(repo, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "b")
+    # What an editor in the container does: rewrite with LF.
+    (repo / "crlf.py").write_bytes(b"a = 1\nb = 2\nc = 3\n")
+    (repo / "lf.py").write_bytes(b"x = 1\ny = 2\n")
+    (repo / "still_crlf.py").write_bytes(b"new\nkeep\r\nmore\n")  # editor mixed: fixed
+    (repo / "added.py").write_bytes(b"new\n")  # new file: left as written
+    subprocess.run([sys.executable, "-c", KEEP_EOL], cwd=repo, check=True)
+    assert (repo / "crlf.py").read_bytes() == b"a = 1\r\nb = 2\r\nc = 3\r\n"
+    assert (repo / "lf.py").read_bytes() == b"x = 1\ny = 2\n"
+    assert (repo / "still_crlf.py").read_bytes() == b"new\r\nkeep\r\nmore\r\n"
+    assert (repo / "added.py").read_bytes() == b"new\n"
+    numstat = subprocess.run(
+        ["git", "-c", "core.autocrlf=false", "diff", "--numstat", "--", "crlf.py"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.split()
+    assert numstat[:2] == ["1", "0"]  # one line added, nothing rewritten
