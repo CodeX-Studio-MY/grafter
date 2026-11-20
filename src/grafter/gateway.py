@@ -12,9 +12,17 @@ import re
 import urllib.error
 import urllib.request
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import Any
 
 _KEY_RE = re.compile(r"sk-[A-Za-z0-9_-]{4,}")
+
+
+@dataclass(frozen=True)
+class Completion:
+    text: str
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
 
 
 class GatewayError(RuntimeError):
@@ -91,14 +99,30 @@ class GatewayClient:
         self._request("POST", "/key/delete", {"keys": [key]}, key=self._master_key)
 
     def chat(self, key: str, model: str, prompt: str, max_tokens: int = 64) -> str:
-        body = {
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": max_tokens,
-        }
+        return self.complete(key, model, [{"role": "user", "content": prompt}], max_tokens).text
+
+    def complete(
+        self, key: str, model: str, messages: list[dict[str, str]], max_tokens: int
+    ) -> Completion:
+        """One chat completion with a run key; returns the text and its token usage."""
+        body = {"model": model, "messages": messages, "max_tokens": max_tokens}
         resp = self._request("POST", "/v1/chat/completions", body, key=key)
         try:
             content = resp["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError):
             raise GatewayError("unexpected chat response shape") from None
-        return str(content)
+        usage = resp.get("usage") or {}
+        return Completion(
+            text=str(content),
+            prompt_tokens=int(usage.get("prompt_tokens") or 0),
+            completion_tokens=int(usage.get("completion_tokens") or 0),
+        )
+
+    def key_spend(self, key: str) -> float:
+        """USD the gateway has booked against `key`: the authoritative cost (D16)."""
+        resp = self._request("GET", "/key/info", key=key)
+        try:
+            spend = resp["info"]["spend"]
+            return float(spend)
+        except (KeyError, TypeError, ValueError):
+            raise GatewayError("unexpected key info response: no spend") from None

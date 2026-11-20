@@ -23,6 +23,7 @@ class FakeLiteLLM:
         self.fail: dict[str, tuple[int, str]] = {}
         self.chat_response: Any = {"choices": [{"message": {"content": "ok"}}]}
         self.generate_response: Any = {"key": RUN_KEY}
+        self.key_info: Any = {"key": "hashed", "info": {"spend": 0.0123}}
         fake = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -42,6 +43,7 @@ class FakeLiteLLM:
                     "/key/generate": fake.generate_response,
                     "/key/delete": {"deleted_keys": (body or {}).get("keys", [])},
                     "/v1/chat/completions": fake.chat_response,
+                    "/key/info": fake.key_info,
                 }
                 if self.path not in routes:
                     self._send(404, b'{"error": "not found"}')
@@ -237,3 +239,37 @@ def test_dropped_connection_is_gateway_error() -> None:
     with pytest.raises(GatewayError, match="unreachable"):
         GatewayClient(f"http://127.0.0.1:{port}", MASTER, timeout=5).health()
     srv.close()
+
+
+# --- complete / key_spend (TODO 1C3a) ------------------------------------------------
+
+
+def test_complete_returns_text_and_usage(fake: FakeLiteLLM) -> None:
+    fake.chat_response = {
+        "choices": [{"message": {"content": "plan"}}],
+        "usage": {"prompt_tokens": 120, "completion_tokens": 30},
+    }
+    msgs = [{"role": "system", "content": "s"}, {"role": "user", "content": "u"}]
+    reply = GatewayClient(fake.url, MASTER).complete(RUN_KEY, "claude-opus-5-5", msgs, 500)
+    assert (reply.text, reply.prompt_tokens, reply.completion_tokens) == ("plan", 120, 30)
+    _, path, auth, body = fake.calls[0]
+    assert path == "/v1/chat/completions" and auth == f"Bearer {RUN_KEY}"
+    assert body == {"model": "claude-opus-5-5", "messages": msgs, "max_tokens": 500}
+
+
+def test_complete_without_usage_counts_zero(fake: FakeLiteLLM) -> None:
+    reply = GatewayClient(fake.url, MASTER).complete(RUN_KEY, "m", [], 10)
+    assert (reply.text, reply.prompt_tokens, reply.completion_tokens) == ("ok", 0, 0)
+
+
+def test_key_spend_uses_the_run_key(fake: FakeLiteLLM) -> None:
+    assert GatewayClient(fake.url, MASTER).key_spend(RUN_KEY) == 0.0123
+    method, path, auth, _ = fake.calls[0]
+    assert (method, path, auth) == ("GET", "/key/info", f"Bearer {RUN_KEY}")
+
+
+@pytest.mark.parametrize("info", [{}, {"info": {}}, {"info": {"spend": "x"}}, "text"])
+def test_key_spend_bad_shape(fake: FakeLiteLLM, info: Any) -> None:
+    fake.key_info = info
+    with pytest.raises(GatewayError, match="spend"):
+        GatewayClient(fake.url, MASTER).key_spend(RUN_KEY)
