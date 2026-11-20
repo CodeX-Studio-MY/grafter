@@ -90,7 +90,7 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
   - [x] **1C1b** Build it and run the sandbox repo's tests inside it (`--network none`, or `grafter-gw` only). Done when: container runs the repo's tests. Verified locally (Docker 29.9.3): 4 passed as uid 10001, 36% coverage, network blocked. (#17)
 - [x] **1C2** Spike: OpenHands Software Agent SDK + DockerWorkspace hello-world (MIT packages only; verify licence; update `THIRD_PARTY.md`). Done when: agent edits a file inside the container. (#19)
 - [ ] **1C3** `OpenHandsEngine.run`: two steps (D15): `models.planner` writes a plan from task + charter + `AGENTS.md` + rules, then `models.coder` executes it; returns `RunResult` (changed files, summary, risks, tokens, cost); token budget enforced. Split:
-  - [ ] **1C3a** Engine with per-task gateway key, patch brought back and applied with `git apply`; nothing agent-written runs on the host. Done when: tests with fake LLM + fake sandbox, and one real engine run on the sandbox repo whose diff the guard allows.
+  - [x] **1C3a** Engine with per-task gateway key, patch brought back and applied with `git apply`; nothing agent-written runs on the host. Done when: tests with fake LLM + fake sandbox, and one real engine run on the sandbox repo whose diff the guard allows. (#21)
   - [ ] **1C3b** `grafter run` with `engine: openhands` (needs 1D2b so gates run in a container). Done when: a real run on the sandbox repo opens a PR.
 - [x] **1C4** Fake engine for tests (deterministic diff). Done when: full pipeline test runs offline in CI.
 
@@ -99,6 +99,7 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [ ] **1D2** Verification gates after the engine, split:
   - [x] **1D2a** `gates.run_gates`: suite passes, overall coverage did not drop, target file improved; failures carry a reason. Runs through a `CommandRunner` (`LocalRunner` for tests). Done when: tests on real pytest runs against the sandbox template.
   - [ ] **1D2b** Docker `CommandRunner` so gates run in a fresh sandbox container (needs 1C1b). Never run repo commands on the host in real runs. Done when: gates pass/fail the same way inside the container.
+  - [ ] **1D2c** Agent container reaches only the gateway (internal network + relay, spike 1C2). Real `grafter run` with `engine: openhands` stays refused until this is done. Done when: from inside the agent container the internet is blocked and the gateway is reachable, and an engine run still passes.
 - [ ] **1D3** `grafter run`: lock → kill switch → find → engine → gates → guard → branch/commit/push/PR → record; stop at `max_prs_per_night` or budget. `--dry-run` skips push/PR. Split:
   - [x] **1D3a** Pipeline + CLI offline: local bare origin, fake engine, fake GitHub; ≤ N PRs, none on re-run, protected/skip edits rejected, kill switch + lock exit codes. Real runs refused with `runner: local`. Done when: offline end-to-end tests + `--dry-run`. (#17)
   - [ ] **1D3b** 🧑 Needs 1D2b, the App (0D2) and the sandbox repo. Done when: a real run on the sandbox repo opens ≤ N PRs.
