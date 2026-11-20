@@ -1,7 +1,7 @@
 # Grafter — TODO
 
 Status board and single source of project status. One group of related items = one branch + one PR; one commit per item.
-Claude ticks a box only after its **Done when** check passed, in the same PR as the work.
+Claude ticks a box only after its **Done when** check passed, in a separate `status/<date>` PR after the work merged.
 
 Legend: `[ ]` todo · `[x]` done · 🧑 needs the user (Claude cannot do it alone) · ⚖️ decision needed
 
@@ -9,10 +9,11 @@ Legend: `[ ]` todo · `[x]` done · 🧑 needs the user (Claude cannot do it alo
 
 1. `git switch -c <type>/<ids>-<slug>` from fresh `main` (e.g. `fix/0B1-0B2-paths`).
 2. Write tests first, then code.
-3. `ruff check . && ruff format --check . && pytest -q` green locally (`pre-commit run -a`).
+3. `ruff check . && ruff format --check . && mypy && pytest -q` green locally (`pre-commit run -a`).
 4. Run the item's **Done when** check; paste the output into the PR body.
-5. One commit per item, message `[<id>] <summary>`. PR title `[<ids>] <summary>`; tick the boxes in this file in the same PR.
-6. User reviews and merges. Next item.
+5. One commit per item, message `[<id>] <summary>`. PR title `[<ids>] <summary>`. Feature PRs never edit this file; the PR body lists the items it completes.
+6. User reviews and merges.
+7. A `status/<date>` PR ticks the verified boxes (with the source PR, e.g. `(#17)`) and splits items. Next item.
 
 Never tick an unverified item. If an item is split, add sub-items instead of ticking partially.
 
