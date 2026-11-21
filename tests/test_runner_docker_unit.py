@@ -109,9 +109,10 @@ def test_run_creates_hardened_offline_container_and_cleans_up(
         "--pids-limit 512",
         "--memory 2g",
         "--user 10001:10001",
-        "-w /workspace",
     ):
         assert flag in flags
+    assert "-w" not in create  # Docker would create the dir as root; the entry script does it
+    assert "mkdir -p /workspace && tar -xf - -C /workspace" in flags
     assert "-v" not in create and "--volume" not in create and "--mount" not in create
     image_at = create.index("img:1")
     assert create[image_at + 1 : image_at + 3] == ["-c", create[image_at + 2]]
@@ -217,3 +218,38 @@ def test_default_image_and_local_runner_accepts_outputs(tmp_path: Path) -> None:
     assert default_image("python") == "grafter-sandbox-python:latest"
     res = LocalRunner().run("python -c \"print('hi')\"", tmp_path, outputs=["x.json"])
     assert res.exit_code == 0 and res.stdout.strip() == "hi"
+
+
+def test_read_only_volumes_env_and_out_dir(
+    fake_docker: tuple[list[str], Path], tree: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    docker, log = fake_docker
+    report = tmp_path / "cp.tar"
+    report.write_bytes(one_file_tar("t.sarif", b"{}"))
+    monkeypatch.setenv("FAKE_CP_TAR", str(report))
+    out = tmp_path / "out"
+    runner = DockerRunner(
+        "img", docker=docker, volumes=[("grafter-scan-cache", "/cache")], env={"A_B": "/cache/x"}
+    )
+    runner.run("trivy fs .", tree, outputs=[".grafter-scan/t.sarif"], out_dir=out)
+    create = calls(log)[0]
+    assert create[create.index("-v") + 1] == "grafter-scan-cache:/cache:ro"
+    assert create[create.index("-e") + 1] == "A_B=/cache/x"
+    assert "--network" in create and create[create.index("--network") + 1] == "none"
+    assert (out / ".grafter-scan" / "t.sarif").read_bytes() == b"{}"
+    assert not (tree / ".grafter-scan").exists()  # nothing written into the work tree
+
+
+@pytest.mark.parametrize(
+    ("volumes", "env"),
+    [
+        ([("C:/host/dir", "/cache")], {}),  # a host path, not a named volume
+        ([("/etc", "/cache")], {}),
+        ([("cache", "relative")], {}),
+        ([("cache", "/c:rw")], {}),
+        ([], {"bad-name": "x"}),
+    ],
+)
+def test_rejects_bad_mounts_and_env(volumes: list[tuple[str, str]], env: dict[str, str]) -> None:
+    with pytest.raises(RunnerError, match="bad"):
+        DockerRunner("img", volumes=volumes, env=env)

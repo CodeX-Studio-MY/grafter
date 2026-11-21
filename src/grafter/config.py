@@ -77,6 +77,45 @@ class OpenHands(BaseModel):
     health_timeout_s: int = Field(default=120, ge=5)
 
 
+# Scanner images (TODO 1E2), pinned by digest: newest releases >= 14 days old on 2026-11-21.
+TRIVY_IMAGE = (  # aquasec/trivy 0.76.2 (2026-11-05), Apache-2.0
+    "aquasec/trivy@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb"
+)
+OSV_IMAGE = (  # ghcr.io/google/osv-scanner v2.7.0 (2026-10-12), Apache-2.0
+    "ghcr.io/google/osv-scanner@sha256:4f3b7e2c64b9d38a5febc5a7e4a3dfef1d1362f726dea7a2ef4762b46469fcd0"
+)
+
+
+ScanTool = Literal["trivy", "osv"]
+SCAN_TOOLS: tuple[ScanTool, ...] = ("trivy", "osv")
+
+
+class Scanning(BaseModel):
+    """Scanners whose findings are stored as candidate tasks (1E2, D20). Both run offline:
+    databases are refreshed in a step that has no repo content; scans get no network."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tools: list[ScanTool] = Field(default_factory=lambda: list(SCAN_TOOLS))
+    trivy_image: str = Field(default=TRIVY_IMAGE, min_length=1)
+    osv_image: str = Field(default=OSV_IMAGE, min_length=1)
+    cache_volume: str = Field(default="grafter-scan-cache", pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+    # OSV databases to keep offline (osv.dev ecosystem names). PyPI ~37 MB, npm ~212 MB.
+    osv_ecosystems: list[str] = Field(
+        default_factory=lambda: ["PyPI", "npm", "Maven", "Go", "NuGet", "Pub"]
+    )
+    refresh_hours: int = Field(default=12, ge=1)
+    timeout_s: int = Field(default=900, ge=60)
+
+    @field_validator("osv_ecosystems")
+    @classmethod
+    def _ecosystem_names(cls, v: list[str]) -> list[str]:
+        for name in v:
+            if not re.fullmatch(r"[A-Za-z][A-Za-z0-9.:-]*", name):
+                raise ValueError(f"bad OSV ecosystem name: {name!r}")
+        return v
+
+
 class KillSwitch(BaseModel):
     """Stops all runs when the file exists or the env var is truthy."""
 
@@ -169,6 +208,7 @@ class Config(BaseModel):
     limits: Limits = Limits()
     engine: str = "openhands"
     openhands: OpenHands = OpenHands()
+    scanning: Scanning = Scanning()
     tier0_auto_merge: bool = False
     llm_gateway_url: str = "http://localhost:4000"
     models: Models = Models()

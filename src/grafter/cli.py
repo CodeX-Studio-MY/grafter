@@ -17,11 +17,13 @@ from grafter.config import Config, RepoConfig, load_config
 from grafter.credentials import SecretError
 from grafter.doctor import run_checks
 from grafter.engines import AgentEngine, get_engine
+from grafter.findings import SEVERITIES
 from grafter.gateway import GatewayClient, GatewayError, redact
 from grafter.github import AppAuth, GitHubClient, app_auth
 from grafter.lock import KillSwitchEngaged, LockHeld
-from grafter.pipeline import RunDeps, run_night
+from grafter.pipeline import RunDeps, RunSummary, run_night
 from grafter.runner import DockerRunner, LocalRunner, default_image
+from grafter.scanners import DockerScanner
 from grafter.store import Store
 
 MASTER_KEY_ENV = "LITELLM_MASTER_KEY"
@@ -195,6 +197,13 @@ def docker_runner(repo: RepoConfig) -> DockerRunner:
     return DockerRunner(sandbox_image(repo))
 
 
+def scanner_for(cfg: Config) -> DockerScanner | None:
+    """Scanners run only with the Docker runner (they are containers too)."""
+    if cfg.runner != "docker" or not cfg.scanning.tools:
+        return None
+    return DockerScanner(cfg.scanning)
+
+
 def origin_url_for(auth: AppAuth | None) -> Callable[[RepoConfig], str]:
     def origin_url(repo: RepoConfig) -> str:
         if repo.clone_url:
@@ -250,6 +259,7 @@ def run(
         runner_for=None if cfg.runner == "local" else docker_runner,
         github=github,
         origin_url=origin_url_for(auth),
+        scanner=scanner_for(cfg),
     )
     try:
         summary = run_night(cfg, deps, dry_run=dry)
@@ -270,6 +280,7 @@ def run(
         typer.echo(f"  rejected {rej['target']}: {'; '.join(rej['reasons'])[:200]}")
     for err in summary.errors:
         typer.echo(f"  error {err['repo']}: {err['error'][:200]}")
+    _print_findings(summary)
     typer.echo(f"report: {summary.report_path}")
     if summary.report_url:
         typer.echo(f"report comment: {summary.report_url}")
@@ -277,6 +288,84 @@ def run(
         raise typer.Exit(EXIT_KILL_SWITCH)
     if summary.failed:
         raise typer.Exit(1)
+
+
+def _print_findings(summary: RunSummary) -> None:
+    for f in summary.findings:
+        counts = f"{f['open']} open ({f['new']} new, {f['gone']} gone)"
+        typer.echo(f"  findings {f['repo']} {f['tool']}: {counts}")
+    for e in summary.scan_errors:
+        typer.echo(f"  scan failed {e['repo']} {e['tool']}: {e['error'][:200]}")
+
+
+@app.command()
+def scan(
+    config: Annotated[Path, typer.Option("--config", help="grafter.yaml")] = Path("grafter.yaml"),
+) -> None:
+    """Refresh scanner databases, scan every repo's main branch, store the findings (1E2).
+    Read-only: no engine, no branches, no PRs."""
+    cfg = _load(config)
+    scanner = scanner_for(cfg)
+    if scanner is None:
+        raise _fail("scanning needs runner: docker and at least one tool in scanning.tools", 2)
+    auth: AppAuth | None = None
+    try:
+        auth = app_auth(cfg)
+    except SecretError as e:
+        typer.secho(f"note: GitHub App not used ({e}); cloning anonymously", err=True)
+    deps = RunDeps(
+        engine=lambda found: get_engine("noop"),
+        runner=docker_runner(cfg.repos[0]),
+        github=None,
+        origin_url=origin_url_for(auth),
+        scanner=scanner,
+    )
+    try:
+        summary = run_night(cfg, deps, dry_run=True, scan_only=True)
+    except KillSwitchEngaged as e:
+        raise _fail(str(e), EXIT_KILL_SWITCH) from e
+    except LockHeld as e:
+        raise _fail(str(e), EXIT_LOCK_HELD) from e
+    typer.echo(f"scan {summary.run_id}: stopped: {summary.stopped_reason}")
+    _print_findings(summary)
+    for err in summary.errors:
+        typer.echo(f"  error {err['repo']}: {err['error'][:200]}")
+    typer.echo(f"report: {summary.report_path}")
+    if summary.failed or summary.errors or summary.scan_errors:
+        raise typer.Exit(1)
+
+
+@app.command()
+def findings(
+    config: Annotated[Path, typer.Option("--config", help="grafter.yaml")] = Path("grafter.yaml"),
+    repo: Annotated[str | None, typer.Option("--repo")] = None,
+    tool: Annotated[str | None, typer.Option("--tool", help="trivy or osv")] = None,
+    min_severity: Annotated[
+        str, typer.Option("--min-severity", help="low, medium, high or critical")
+    ] = "low",
+    status: Annotated[str, typer.Option("--status", help="open, gone or all")] = "open",
+) -> None:
+    """List stored scanner findings (candidate tasks; phase 1 does not act on them)."""
+    cfg = _load(config)
+    if min_severity not in SEVERITIES:
+        raise _fail(f"--min-severity must be one of {', '.join(SEVERITIES)}", 2)
+    if status not in ("open", "gone", "all"):
+        raise _fail("--status must be open, gone or all", 2)
+    db = cfg.paths().db_file
+    if not db.is_file():
+        typer.echo("no findings yet (no database); run grafter scan")
+        return
+    with Store(db) as store:
+        store.migrate()
+        rows = store.list_findings(status, repo, tool, min_severity)
+    for r in rows:
+        where = f"{r['path']}:{r['line']}" if r["line"] else r["path"]
+        gone = "  (gone)" if r["status"] == "gone" else ""
+        typer.echo(
+            f"{r['severity']:<8} {r['tool']:<5} {r['repo']:<10} {where:<36} {r['rule_id']:<20}"
+            f" {r['message'][:80]}{gone}"
+        )
+    typer.echo(f"{len(rows)} finding(s)")
 
 
 _STATUS_COLOR = {"ok": typer.colors.GREEN, "warn": typer.colors.YELLOW, "fail": typer.colors.RED}

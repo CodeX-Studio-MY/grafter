@@ -2,6 +2,7 @@ import sqlite3
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 from typer.testing import CliRunner
@@ -57,7 +58,7 @@ def test_migrate_from_empty(tmp_path: Path) -> None:
     db = tmp_path / "nested" / "dir" / "g.db"
     with Store(db) as s:
         assert s.version() == 0
-        assert s.migrate() == 1
+        assert s.migrate() == 2
         tables = {
             r[0] for r in s.conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
         }
@@ -75,11 +76,11 @@ def test_migrate_from_empty(tmp_path: Path) -> None:
 def test_migrate_idempotent(tmp_path: Path) -> None:
     db = tmp_path / "g.db"
     with Store(db) as s:
-        assert s.migrate() == 1
-        assert s.migrate() == 1
-        assert count(s, "schema_version") == 1
+        assert s.migrate() == 2
+        assert s.migrate() == 2
+        assert count(s, "schema_version") == 2
     with Store(db) as s:
-        assert s.migrate() == 1
+        assert s.migrate() == 2
         row = s.conn.execute("SELECT version, applied_at FROM schema_version").fetchone()
     assert row[0] == 1
     assert datetime.fromisoformat(row[1]).utcoffset() is not None
@@ -88,11 +89,12 @@ def test_migrate_idempotent(tmp_path: Path) -> None:
 def test_failed_migration_rolls_back(store: Store, monkeypatch: pytest.MonkeyPatch) -> None:
     import grafter.store as mod
 
-    bad = [*migrations(), (2, "0002_bad.sql", "CREATE TABLE extra(x TEXT);\nNOT SQL;")]
+    latest = migrations()[-1][0]
+    bad = [*migrations(), (latest + 1, "9999_bad.sql", "CREATE TABLE extra(x TEXT);\nNOT SQL;")]
     monkeypatch.setattr(mod, "migrations", lambda: bad)
     with pytest.raises(sqlite3.Error):
         store.migrate()
-    assert store.version() == 1
+    assert store.version() == latest
     names = {r[0] for r in store.conn.execute("SELECT name FROM sqlite_master")}
     assert "extra" not in names
 
@@ -292,7 +294,7 @@ def test_backup(store: Store, tmp_path: Path) -> None:
     dest = store.backup(tmp_path / "backups" / "copy.db")
     assert dest.exists()
     with Store(dest) as copy:
-        assert copy.version() == 1
+        assert copy.version() == 2
         assert copy.get_change(cid) == store.get_change(cid)
         assert copy.events(cid) == store.events(cid)
 
@@ -324,13 +326,13 @@ def test_cli_migrate_and_backup(tmp_path: Path) -> None:
     db = tmp_path / "data" / "g.db"
     result = runner.invoke(app, ["db", "migrate", "--config", cfg, "--db", str(db)])
     assert result.exit_code == 0, result.output
-    assert "schema version 1" in result.output and db.exists()
+    assert "schema version 2" in result.output and db.exists()
     dest = tmp_path / "bk" / "g.bak.db"
     result = runner.invoke(app, ["db", "backup", str(dest), "--config", cfg, "--db", str(db)])
     assert result.exit_code == 0, result.output
     assert "g.bak.db" in result.output
     with Store(dest) as copy:
-        assert copy.version() == 1
+        assert copy.version() == 2
 
 
 def test_cli_default_db_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -357,3 +359,73 @@ def test_cli_bad_config(tmp_path: Path) -> None:
     result = runner.invoke(app, ["db", "migrate", "--config", str(tmp_path / "missing.yaml")])
     assert result.exit_code == 1
     assert "invalid config" in result.output
+
+
+# --- findings (TODO 1E2) -----------------------------------------------------------------
+
+
+def _f(rule: str, path: str = "requirements.txt", sev: str = "high", line: int | None = 1) -> Any:
+    from grafter.findings import Finding
+
+    return Finding("trivy", rule, sev, path, line, f"message {rule}")  # type: ignore[arg-type]
+
+
+def test_upsert_findings_new_open_gone_reopen(store: Store) -> None:
+    c1 = store.upsert_findings("api", "trivy", "r1", [_f("CVE-1"), _f("CVE-2")])
+    assert (c1.new, c1.open, c1.gone) == (2, 2, 0)
+    # Same two again, CVE-1 on another line: nothing new.
+    c2 = store.upsert_findings("api", "trivy", "r2", [_f("CVE-1", line=9), _f("CVE-2")])
+    assert (c2.new, c2.open, c2.gone) == (0, 2, 0)
+    # CVE-2 fixed.
+    c3 = store.upsert_findings("api", "trivy", "r3", [_f("CVE-1")])
+    assert (c3.new, c3.open, c3.gone) == (0, 1, 1)
+    gone = store.list_findings(status="gone")
+    assert [g["rule_id"] for g in gone] == ["CVE-2"] and gone[0]["last_seen_run"] == "r2"
+    # CVE-2 comes back: open again, first_seen kept.
+    c4 = store.upsert_findings("api", "trivy", "r4", [_f("CVE-1"), _f("CVE-2")])
+    assert (c4.new, c4.open, c4.gone) == (0, 2, 0)
+    rows = {r["rule_id"]: r for r in store.list_findings()}
+    assert rows["CVE-2"]["first_seen_run"] == "r1" and rows["CVE-2"]["last_seen_run"] == "r4"
+    assert rows["CVE-1"]["line"] == 1  # latest line kept
+
+
+def test_upsert_findings_is_scoped_by_repo_and_tool(store: Store) -> None:
+    store.upsert_findings("api", "trivy", "r1", [_f("CVE-1")])
+    store.upsert_findings("web", "trivy", "r1", [_f("CVE-1")])
+    c = store.upsert_findings("api", "osv", "r1", [])
+    assert (c.new, c.open, c.gone) == (0, 0, 0)
+    assert len(store.list_findings()) == 2  # osv's empty scan closed nothing of trivy's
+
+
+def test_list_findings_filters_and_order(store: Store) -> None:
+    store.upsert_findings(
+        "api", "trivy", "r1", [_f("A", sev="low"), _f("B", sev="critical"), _f("C", sev="medium")]
+    )
+    store.upsert_findings("web", "osv", "r1", [_f("D", sev="high")])
+    assert [r["rule_id"] for r in store.list_findings()] == ["B", "D", "C", "A"]
+    assert [r["rule_id"] for r in store.list_findings(min_severity="high")] == ["B", "D"]
+    assert [r["rule_id"] for r in store.list_findings(repo="web")] == ["D"]
+    assert [r["rule_id"] for r in store.list_findings(tool="trivy", repo="api")] == ["B", "C", "A"]
+    assert store.list_findings(status="all", repo="nope") == []
+
+
+def test_migrate_from_v1_keeps_data(tmp_path: Path) -> None:
+    import sqlite3 as sq
+
+    from grafter.store import migrations
+
+    db = tmp_path / "old.db"
+    conn = sq.connect(db)
+    conn.execute(
+        "CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
+    )
+    v1 = next(sql for v, _n, sql in migrations() if v == 1)
+    conn.executescript(v1)
+    conn.execute("INSERT INTO schema_version VALUES (1, 'then')")
+    conn.execute("INSERT INTO runs (id, started_at, status) VALUES ('old', 'then', 'ok')")
+    conn.commit()
+    conn.close()
+    with Store(db) as s:
+        assert s.migrate() == 2
+        assert s.conn.execute("SELECT id FROM runs").fetchone()[0] == "old"
+        assert s.list_findings() == []

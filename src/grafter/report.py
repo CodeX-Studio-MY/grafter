@@ -74,6 +74,17 @@ def render_report(summary: RunSummary, cfg: Config) -> str:
         lines += [f"- {_where(s)}: {_cell(s.get('reason', ''))}" for s in summary.skipped]
     else:
         lines.append("None.")
+    if summary.findings or summary.scan_errors:
+        lines += ["", "## Findings (candidate tasks, not acted on in phase 1)", ""]
+        lines += [
+            f"- `{_cell(f['repo'])}` {f['tool']}: {f['open']} open"
+            f" ({f['new']} new, {f['gone']} gone)"
+            for f in summary.findings
+        ]
+        lines += [
+            f"- `{_cell(e['repo'])}` {e['tool']}: scan failed: {_cell(e['error'])[:300]}"
+            for e in summary.scan_errors
+        ]
     if summary.errors:
         lines += ["", "## Errors", ""]
         lines += [

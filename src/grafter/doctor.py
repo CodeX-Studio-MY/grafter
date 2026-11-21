@@ -135,6 +135,42 @@ def _agent_network(cfg: Config) -> Check:
     return Check("agent network", "ok", f"{net}: internal (gateway only); image {image}")
 
 
+def _scanners(cfg: Config) -> Check:
+    """1E2: scanner images and their database cache. Missing ones are fetched on the first
+    `grafter scan`/run, so this only warns."""
+    tools = cfg.scanning.tools
+    if cfg.runner != "docker" or not tools:
+        return Check("scanners", "ok", "off (needs runner: docker and scanning.tools)")
+    docker = shutil.which("docker")
+    if docker is None:
+        return Check("scanners", "fail", "docker: not on PATH")
+    images = {"trivy": cfg.scanning.trivy_image, "osv": cfg.scanning.osv_image}
+    missing = []
+    for tool in tools:
+        proc = subprocess.run(
+            [docker, "image", "inspect", "--format", "{{.Id}}", images[tool]],
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+        if proc.returncode != 0:
+            missing.append(tool)
+    vol = subprocess.run(
+        [docker, "volume", "inspect", cfg.scanning.cache_volume],
+        capture_output=True,
+        timeout=30,
+        check=False,
+    )
+    notes = []
+    if missing:
+        notes.append(f"images not pulled yet: {', '.join(missing)}")
+    if vol.returncode != 0:
+        notes.append(f"no database cache yet ({cfg.scanning.cache_volume})")
+    if notes:
+        return Check("scanners", "warn", "; ".join(notes) + "; run grafter scan once")
+    return Check("scanners", "ok", f"{', '.join(tools)}; cache {cfg.scanning.cache_volume}")
+
+
 def _engine(cfg: Config) -> Check:
     try:
         engine = get_engine(cfg.engine, cfg)
@@ -216,7 +252,7 @@ def run_checks(config: Path, environ: Mapping[str, str] | None = None) -> list[C
     checks.append(Check("git", "ok", git) if git else Check("git", "fail", "git not on PATH"))
     works, detail = docker_info()
     checks.append(Check("docker", "ok" if works else "warn", detail))
-    checks += [_runner(cfg), _engine(cfg), _gateway(cfg), _github(cfg, environ)]
+    checks += [_runner(cfg), _scanners(cfg), _engine(cfg), _gateway(cfg), _github(cfg, environ)]
     if cfg.engine == "openhands":
         checks.append(_agent_network(cfg))
     return checks
