@@ -21,7 +21,7 @@ Scheduler ─► Orchestrator ─► Agent workers ──► LLM gateway (LiteLL
 
 ## Stack
 
-| Layer | v1 | Later (phase 4) |
+| Layer | v1 | Later (phase 6) |
 |---|---|---|
 | Scheduler | cron | same |
 | Orchestrator | Python script | Python FastAPI (+ Temporal if needed) |

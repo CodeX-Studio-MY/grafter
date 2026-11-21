@@ -38,7 +38,7 @@ See [examples/acme-harvest](../examples/acme-harvest) (fictional).
 
 1. **Cite the charter.** Every change names the purpose, domain or invariant it serves. No citation → rejected.
 2. **Separate judge.** An agent that did not write the change scores charter alignment. Rejected changes are logged with the reason, never dropped silently.
-3. **Features never become code.** New capabilities arrive as issues only.
+3. **Features are issues by default.** With `feature_changes: propose_only` (the default) new capabilities arrive as issues only. `allow_code` (phase 4, D22) lets Grafter write them as code PRs; they still cite the charter, pass the judge and need human approval.
 4. **Locked.** The charter and protected paths are read-only to the AI.
    Always protected, even if the charter omits them: `grafter.charter.yaml`, `grafter.yaml`, `**/AGENTS.md`, `.github/`, `.grafter/`.
 5. **Drift signals.** New modules, dependencies and domain vocabulary are flagged and tracked.

@@ -141,7 +141,7 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [ ] **2.8** Separate reviewer agent + charter judge on `models.reviewer` / `models.judge` (Opus 5.5, never the coder's prompt); judge rejections logged.
 - [ ] **2.9** Drift signals: new modules, dependencies, domain vocabulary flagged in the PR.
 - [ ] **2.10** Learning loop: approval rate per category; rejection comments into agent memory; throttle low-acceptance categories.
-- [ ] **2.11** Features as issues: feature ideas filed as issues, never code.
+- [ ] **2.11** Features as issues: feature ideas filed as issues (`feature_changes: propose_only`, the default; code only from 4.6).
 - [ ] **2.12** Prompt-injection defences: mark untrusted content, no secret access from tools, diff check for exfiltration patterns.
 - [ ] **2.13** Opt-in Tier 0 auto-merge (explicit ruleset bypass), off by default.
 - [ ] **2.14** DB backups + stale branch cleanup.
@@ -150,15 +150,39 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 
 ---
 
-## Phase 3 — Public release
-- [ ] **3.1** Scrub repo and history for pilot names and data. 🧑 sign-off.
-- [ ] **3.2** Docs site, quickstart with the fictional example, case study with sanitised numbers.
-- [ ] **3.3** SECURITY.md review, threat model doc, release workflow (PyPI), CHANGELOG.
-- [ ] **3.4** 🧑 Make the repo public.
+## Phase 3 — Normal-risk fixes (D21)
+- [ ] **3.1** ⚖️ Risk tiers: what makes a change low vs normal risk (diff size, files touched, `review_paths`, business logic). Record in `docs/decisions.md`.
+- [ ] **3.2** Task finders: business-logic bugs from issues labelled `grafter`, breaking dependency upgrades Renovate cannot do alone, multi-file refactors.
+- [ ] **3.3** Size caps per risk tier (configurable); the PR shows its tier and why.
+- [ ] **3.4** Evidence in every PR: tests added or changed, coverage delta, before/after behaviour.
+- [ ] **3.5** ⚖️ Gate thresholds for phase 3 → 4 (approval rate, zero invariant breaks). Record in `docs/decisions.md`.
 
-## Phase 4 — Dashboard + next solution
-- [ ] **4.1** FastAPI backend over the change DB.
-- [ ] **4.2** Next.js dashboard.
-- [ ] **4.3** Onboard a second solution.
-- [ ] **4.4** More engine adapters (OpenCode, Claude Code, Codex CLI).
-- [ ] **4.5** ⚖️ Enterprise evaluation (D2): includes whether PostgreSQL is needed (D17).
+**Gate 3 → 4:** 1–2 months of real results meeting the 3.5 thresholds.
+
+---
+
+## Phase 4 — Solution self-evolution (D21, D22)
+- [ ] **4.1** Charter: `feature_changes: allow_code` (default stays `propose_only`) and a `ui_ux` change type; `grafter validate` accepts both.
+- [ ] **4.2** Improvement scout: scans the whole solution on a schedule for UI/UX, performance and best-practice opportunities; ranks them by charter fit; stores them as candidate tasks.
+- [ ] **4.3** ⚖️ Best-practice sources: which sources count (framework release notes, official guides, pinned and cited in the PR); no unvetted web content in prompts (prompt injection).
+- [ ] **4.4** Performance evidence: benchmark before/after in the sandbox; no measured gain → no PR.
+- [ ] **4.5** UI/UX evidence: before/after screenshots from `ai/preview` and an accessibility check in the PR.
+- [ ] **4.6** Feature code PRs (only with `allow_code`): from an accepted issue or a charter-cited idea, behind a feature flag where the solution has them; judge must pass.
+- [ ] **4.7** Churn limits: evolution PRs per night/week, cooldown on recently changed files, throttle categories with rejections (2.10).
+
+**Gate 4 → 5:** evolution PRs approved at the threshold; zero invariant breaks.
+
+---
+
+## Phase 5 — Public release
+- [ ] **5.1** Scrub repo and history for pilot names and data. 🧑 sign-off.
+- [ ] **5.2** Docs site, quickstart with the fictional example, case study with sanitised numbers.
+- [ ] **5.3** SECURITY.md review, threat model doc, release workflow (PyPI), CHANGELOG.
+- [ ] **5.4** 🧑 Make the repo public.
+
+## Phase 6 — Dashboard + next solution
+- [ ] **6.1** FastAPI backend over the change DB.
+- [ ] **6.2** Next.js dashboard.
+- [ ] **6.3** Onboard a second solution.
+- [ ] **6.4** More engine adapters (OpenCode, Claude Code, Codex CLI).
+- [ ] **6.5** ⚖️ Enterprise evaluation (D2): includes whether PostgreSQL is needed (D17).

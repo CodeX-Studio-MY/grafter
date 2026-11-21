@@ -22,10 +22,10 @@ Open-source (MIT) AI maintainer embedded 1:1 into ONE software solution. Nightly
 
 ## Fixed decisions (do not change without the user)
 - MIT; 1:1 per solution; not multi-tenant; GitHub only (v1).
-- Python backend; Next.js dashboard only in phase 4. v1 review UI = GitHub PRs.
+- Python backend; Next.js dashboard only in phase 6. v1 review UI = GitHub PRs.
 - Fix branches cut from `main`; `ai/preview` rebuilt, never committed to.
 - AI never pushes to `main`; Tier 0 auto-merge opt-in, default off.
-- Features are proposed as issues, never written as code.
+- Features are proposed as issues by default (`feature_changes: propose_only`); code only when the charter says `allow_code`, from phase 4 (D22).
 - Safety features never become paid-only.
 
 ## Rules for working in this repo

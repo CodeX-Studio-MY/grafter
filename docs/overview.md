@@ -27,4 +27,4 @@ Grafter is an open-source (MIT) AI maintainer embedded into one software solutio
 
 - Multi-solution or multi-tenant operation
 - Deploying to production
-- Writing new features as code (features are proposed as issues only)
+- Writing new features as code unless the charter opts in with `feature_changes: allow_code` (phase 4, D22); by default features are proposed as issues only
