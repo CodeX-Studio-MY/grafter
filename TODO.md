@@ -105,9 +105,9 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [x] **1D3** `grafter run`: lock → kill switch → find → engine → gates → guard → branch/commit/push/PR → record; stop at `max_prs_per_night` or budget. `--dry-run` skips push/PR. Split:
   - [x] **1D3a** Pipeline + CLI offline: local bare origin, fake engine, fake GitHub; ≤ N PRs, none on re-run, protected/skip edits rejected, kill switch + lock exit codes. Real runs refused with `runner: local`. Done when: offline end-to-end tests + `--dry-run`. (#17)
   - [x] **1D3b** Needs 1D2b, the App (0D2) and the sandbox repo. Done when: a real run on the sandbox repo opens ≤ N PRs. (verified 2026-11-21, #29; sandbox PRs #1, #2)
-- [ ] **1D4** Nightly run report (PRs opened, rejections + reasons, tokens, cost), split:
+- [x] **1D4** Nightly run report (PRs opened, rejections + reasons, tokens, cost), split:
   - [x] **1D4a** Markdown `report.md` in the run dir. Done when: report exists after a dry run. (#17)
-  - [ ] **1D4b** Post it as an issue comment; real cost from the gateway. Done when: comment exists after a real run.
+  - [x] **1D4b** Post it as an issue comment; real cost from the gateway. Done when: comment exists after a real run. (#31; sandbox issue #4)
 - [ ] **1D5** Nightly schedule, split:
   - [x] **1D5a** `deploy/systemd/grafter.{service,timer}` (02:00, hardened, secrets via 0600 env file) + `deploy/cron/grafter.cron`. Done when: files reviewed.
   - [ ] **1D5b** 🧑 Enable the timer on the VM. Done when: one unattended night on the sandbox repo.
