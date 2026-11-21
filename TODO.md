@@ -76,12 +76,12 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [x] **1B2** GitHub App auth, split:
   - [x] **1B2a** `github.AppAuth`: RS256 JWT, installation token cached until 5 min before expiry. Done when: tests against a fake GitHub API verifying the JWT.
   - [x] **1B2b** With the real App (0D2). Done when: `grafter doctor` lists repos it can see. (verified 2026-11-21: doctor: App sees CodeX-Studio-MY/grafter-sandbox)
-- [ ] **1B3** PR creation, split:
+- [x] **1B3** PR creation, split:
   - [x] **1B3a** `GitHubClient.create_pr` (head must be `ai/*`), `ensure_labels`, `prbody.render_pr` (charter citation, type, tier, tests, coverage delta, risks, tokens, cost, fingerprint marker). Done when: tests against a fake GitHub API.
-  - [ ] **1B3b** 🧑 Done when: a PR opened on the sandbox repo.
-- [ ] **1B4** Idempotency, split:
+  - [x] **1B3b** Done when: a PR opened on the sandbox repo. (verified 2026-11-21, #29; sandbox PRs #1, #2)
+- [x] **1B4** Idempotency, split:
   - [x] **1B4a** `find_open_pr(repo, fingerprint)` matches the exact marker on open `ai/*` PRs; fingerprint = sha256(repo|type|target). Done when: tests against a fake GitHub API.
-  - [ ] **1B4b** 🧑 Done when: a second real run on the sandbox repo opens nothing new.
+  - [x] **1B4b** Done when: a second real run never opens a duplicate PR for an open change. (verified 2026-11-21, #29; sandbox PRs #1, #2)
 - [ ] **1B5** `grafter doctor`, split:
   - [x] **1B5a** Offline checks: config, home, kill switch, lock, DB, git, Docker, engine, gateway, App secrets. Done when: tests. (#17)
   - [ ] **1B5b** 🧑 Add App permissions + rulesets checks; run on the VM. Done when: all green on the VM.
@@ -91,9 +91,9 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
   - [x] **1C1a** `sandboxes/python/Dockerfile` (`python:3.12.15-slim-bookworm`, non-root, no secrets) + `scripts/build-sandbox.sh`. Done when: files reviewed, script syntax-checked.
   - [x] **1C1b** Build it and run the sandbox repo's tests inside it (`--network none`, or `grafter-gw` only). Done when: container runs the repo's tests. Verified locally (Docker 29.9.3): 4 passed as uid 10001, 36% coverage, network blocked. (#17)
 - [x] **1C2** Spike: OpenHands Software Agent SDK + DockerWorkspace hello-world (MIT packages only; verify licence; update `THIRD_PARTY.md`). Done when: agent edits a file inside the container. (#19)
-- [ ] **1C3** `OpenHandsEngine.run`: two steps (D15): `models.planner` writes a plan from task + charter + `AGENTS.md` + rules, then `models.coder` executes it; returns `RunResult` (changed files, summary, risks, tokens, cost); token budget enforced. Split:
+- [x] **1C3** `OpenHandsEngine.run`: two steps (D15): `models.planner` writes a plan from task + charter + `AGENTS.md` + rules, then `models.coder` executes it; returns `RunResult` (changed files, summary, risks, tokens, cost); token budget enforced. Split:
   - [x] **1C3a** Engine with per-task gateway key, patch brought back and applied with `git apply`; nothing agent-written runs on the host. Done when: tests with fake LLM + fake sandbox, and one real engine run on the sandbox repo whose diff the guard allows. (#21)
-  - [ ] **1C3b** `grafter run` with `engine: openhands` (needs 1D2b so gates run in a container). Done when: a real run on the sandbox repo opens a PR.
+  - [x] **1C3b** `grafter run` with `engine: openhands` (needs 1D2b so gates run in a container). Done when: a real run on the sandbox repo opens a PR. (verified 2026-11-21, #29; sandbox PRs #1, #2)
 - [x] **1C4** Fake engine for tests (deterministic diff). Done when: full pipeline test runs offline in CI.
 
 ### 1D Work finding + pipeline
@@ -102,9 +102,9 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
   - [x] **1D2a** `gates.run_gates`: suite passes, overall coverage did not drop, target file improved; failures carry a reason. Runs through a `CommandRunner` (`LocalRunner` for tests). Done when: tests on real pytest runs against the sandbox template.
   - [x] **1D2b** Docker `CommandRunner` so gates run in a fresh sandbox container (needs 1C1b). Never run repo commands on the host in real runs. Done when: gates pass/fail the same way inside the container. (#23)
   - [x] **1D2c** Agent container reaches only the gateway (internal network + relay, spike 1C2). Real `grafter run` with `engine: openhands` stays refused until this is done. Done when: from inside the agent container the internet is blocked and the gateway is reachable, and an engine run still passes. (#25)
-- [ ] **1D3** `grafter run`: lock → kill switch → find → engine → gates → guard → branch/commit/push/PR → record; stop at `max_prs_per_night` or budget. `--dry-run` skips push/PR. Split:
+- [x] **1D3** `grafter run`: lock → kill switch → find → engine → gates → guard → branch/commit/push/PR → record; stop at `max_prs_per_night` or budget. `--dry-run` skips push/PR. Split:
   - [x] **1D3a** Pipeline + CLI offline: local bare origin, fake engine, fake GitHub; ≤ N PRs, none on re-run, protected/skip edits rejected, kill switch + lock exit codes. Real runs refused with `runner: local`. Done when: offline end-to-end tests + `--dry-run`. (#17)
-  - [ ] **1D3b** 🧑 Needs 1D2b, the App (0D2) and the sandbox repo. Done when: a real run on the sandbox repo opens ≤ N PRs.
+  - [x] **1D3b** Needs 1D2b, the App (0D2) and the sandbox repo. Done when: a real run on the sandbox repo opens ≤ N PRs. (verified 2026-11-21, #29; sandbox PRs #1, #2)
 - [ ] **1D4** Nightly run report (PRs opened, rejections + reasons, tokens, cost), split:
   - [x] **1D4a** Markdown `report.md` in the run dir. Done when: report exists after a dry run. (#17)
   - [ ] **1D4b** Post it as an issue comment; real cost from the gateway. Done when: comment exists after a real run.
