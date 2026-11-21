@@ -6,19 +6,63 @@ How to install and run Grafter on its host. **Draft (TODO 1F3a):** it gets finis
 
 ## 1. Host (TODO 0D1)
 
-- Ubuntu LTS VM, owned by the solution owner. Not a GitHub Actions runner (D11).
-- Rootless Docker, Python 3.12, git.
+- Linux VM (Debian 13 or Ubuntu LTS, amd64 or arm64), owned by the solution owner. Not a GitHub Actions runner (D11).
+- Rootless Docker, Python ≥ 3.12, git. About 8 GB RAM, 4 CPUs, 60 GB disk (images + the 2 GB scan cache).
 - A non-root user `grafter`. Everything Grafter writes lives in `/home/grafter/.grafter/` (`home` in `grafter.yaml`).
 - With rootless Docker, put `DOCKER_HOST=unix:///run/user/<uid>/docker.sock` in the env file (step 3).
+- Not Grafter inside a container: it starts its own hardened containers, and handing it the host's Docker socket would give it root on the host.
+
+### macOS host (UTM VM)
+
+Fine for the sandbox repo. Every pinned image (agent server, Trivy, OSV-Scanner, LiteLLM) has an arm64 build.
+
+1. Install [UTM](https://mac.getutm.app) and download the Debian 13 netinst ISO (arm64 on Apple Silicon).
+2. UTM → Create a New Virtual Machine → Virtualize → Linux; 8 GB RAM, 4 CPUs, 60 GB disk.
+3. Install Debian: no desktop; tick **SSH server** and **standard system utilities**.
+4. Keep the Mac awake at night (System Settings → Battery/Energy → prevent automatic sleeping on power adapter) and leave the VM running.
+
+### Base packages and rootless Docker (Debian; Ubuntu: replace `debian` in the repo URL)
+
+As an admin user with sudo:
+
+```bash
+sudo apt update
+sudo apt install -y ca-certificates curl git python3 python3-venv sqlite3 \
+  uidmap dbus-user-session slirp4netns systemd-container
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+https://download.docker.com/linux/debian $(. /etc/os-release && echo $VERSION_CODENAME) stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin \
+  docker-compose-plugin docker-ce-rootless-extras
+sudo systemctl disable --now docker.service docker.socket   # rootless Docker only
+sudo adduser --disabled-password --gecos "" grafter
+sudo loginctl enable-linger grafter    # its Docker keeps running without a login
+sudo machinectl shell grafter@         # a real login session; plain `sudo -iu` lacks one
+```
+
+As `grafter`:
+
+```bash
+dockerd-rootless-setuptool.sh install
+systemctl --user enable --now docker
+echo 'export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock' >> ~/.bashrc && . ~/.bashrc
+docker run --rm hello-world
+docker info --format '{{.SecurityOptions}}'   # must include "rootless"
+```
 
 ## 2. Install Grafter
 
+The repo is private until the public release (phase 5): clone it with a read-only deploy key or after `gh auth login`.
+
 ```bash
 sudo mkdir -p /opt/grafter && sudo chown grafter: /opt/grafter
-sudo -iu grafter
+sudo machinectl shell grafter@
 git clone https://github.com/<owner>/grafter /opt/grafter/src
-python3.12 -m venv /opt/grafter/.venv
-/opt/grafter/.venv/bin/pip install /opt/grafter/src
+python3 -m venv /opt/grafter/.venv                       # Python ≥ 3.12
+/opt/grafter/.venv/bin/pip install "/opt/grafter/src[openhands]"
 ```
 
 ## 3. Config and secrets
@@ -130,9 +174,10 @@ For a full stop, also run `sudo systemctl disable --now grafter.timer`.
 ## 11. Upgrade
 
 ```bash
-cd /opt/grafter/src && git pull && /opt/grafter/.venv/bin/pip install .
+cd /opt/grafter/src && git pull && /opt/grafter/.venv/bin/pip install ".[openhands]"
 grafter db migrate --config ~/.grafter/grafter.yaml
 /opt/grafter/src/scripts/build-sandbox.sh python
+/opt/grafter/src/scripts/build-sandbox.sh agent-python
 ```
 
 To upgrade the gateway, see its README.
