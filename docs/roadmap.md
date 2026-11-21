@@ -10,7 +10,7 @@
 | 5 Public release | After pilot | Public repo, docs, SECURITY.md, credits, case study with real numbers | Repo stable, issues answered |
 | 6 Dashboard + next solution | Later | Next.js dashboard, second solution, evaluate enterprise options (incl. PostgreSQL, D17) | — |
 
-Durations are estimates. Gate thresholds: [D14](decisions.md) (coverage baseline + 20 points, at least 60%; ≥ 70% of the last 20 PRs approved; throttle after 3 rejections in a row).
+Durations are estimates. Gate thresholds: [D14](decisions.md) (coverage baseline + 20 points, at least 60%; ≥ 70% of the last 20 PRs approved; throttle after 3 rejections in a row). Phase 3 → 4 thresholds are decided in TODO 3.5.
 
 ## Before going public
 

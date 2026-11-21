@@ -8,3 +8,4 @@ Grafter holds write access to repositories and runs AI-written code. Please repo
 - Every merge into production needs a human approving review (Tier 0 auto-merge is opt-in).
 - Sandboxes hold no production secrets and no raw LLM keys.
 - The Solution Charter and protected paths are read-only to the AI.
+- New features are written as code only if the charter opts in (`feature_changes: allow_code`); only a human can edit the charter.

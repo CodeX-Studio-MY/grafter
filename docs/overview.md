@@ -1,6 +1,6 @@
 # Overview
 
-Grafter is an open-source (MIT) AI maintainer embedded into one software solution, so the solution keeps improving, fixing bugs and patching security on its own, without drifting from its core purpose.
+Grafter is an open-source (MIT) AI maintainer embedded into one software solution, so the solution keeps improving on its own (tests, bug fixes, security patches, and later UI/UX, performance and current best practice), without drifting from its core purpose.
 
 - **Pitch:** Continuous AI that grafts only what you approve.
 - **Model:** 1:1. One Grafter instance per solution. Not multi-tenant, not a shared platform.

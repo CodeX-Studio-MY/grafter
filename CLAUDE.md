@@ -7,7 +7,7 @@ Open-source (MIT) AI maintainer embedded 1:1 into ONE software solution. Nightly
 
 ## Current state and next work
 - **`TODO.md` is the single source of status.** Read it at session start; the first unticked item without 🧑/⚖️ is next.
-- Phase: **0 — Foundations** (see `docs/roadmap.md`). Scaffold only: charter model, guard, config, CLI `validate`.
+- Phase: **1 — Script pilot** (see `docs/roadmap.md`). All phase-1 code items are done and proven on the sandbox repo; the remaining phase-0/1 items need the user (VM, pilot). Next code work: phase 2.
 - Pilot charter + AGENTS.md live in the PILOT's repos, never in this repo.
 - OpenHands: MIT packages only, never `enterprise/`. Phase 1 job type: writing tests only.
 

@@ -1,6 +1,8 @@
 # Architecture
 
 ```
+Task finders (coverage, scanners, issues; improvement scout from phase 4)
+                       │
 Scheduler ─► Orchestrator ─► Agent workers ──► LLM gateway (LiteLLM)
                                    │
                                    ▼
@@ -21,13 +23,13 @@ Scheduler ─► Orchestrator ─► Agent workers ──► LLM gateway (LiteLL
 
 ## Stack
 
-| Layer | v1 | Later (phase 6) |
+| Layer | v1 | Later |
 |---|---|---|
 | Scheduler | cron | same |
 | Orchestrator | Python script | Python FastAPI (+ Temporal if needed) |
 | Agent workers | Python + OpenHands SDK in Docker | same |
 | LLM access | LiteLLM gateway (`deploy/litellm/`, own private Postgres, D18), scoped key per run, $5/night cap; planner/reviewer/judge = Opus 5.5, coder = Sonnet 5.5 (configurable) | same |
-| Review UI | GitHub PRs | Next.js dashboard |
+| Review UI | GitHub PRs | Next.js dashboard (phase 6) |
 | State | SQLite on local disk, WAL mode (D17) | same; PostgreSQL only if the enterprise evaluation needs it |
 | Git | GitHub App | same |
 | Scanners | Renovate, Trivy, OSV-Scanner (D20; Semgrep deferred, 1E3) | same |

@@ -20,8 +20,8 @@ non_goals: [..]
 invariants: [..]            # must never break
 protected_paths: [..]       # never touched by the AI
 review_paths: [..]          # allowed, always Tier 2 (e.g. db/migrations/)
-allowed_change_types: [bugfix, security, performance, test, refactor, docs, dependency]
-feature_changes: propose_only
+allowed_change_types: [bugfix, security, performance, test, refactor, docs, dependency]  # ui_ux from TODO 4.1
+feature_changes: propose_only  # default; allow_code lets Grafter write features as code (phase 4, D22)
 repos:                      # optional extra rules per repo, on top of the global ones
   <repo-name>:              # must match a `repos[].name` in grafter.yaml
     protected_paths: [..]

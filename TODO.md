@@ -47,7 +47,7 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [x] **0C5** ⚖️ Choose phase-1 state store: SQLite (simple, one host) or PostgreSQL (as in docs); record as a decision. → D17 (SQLite; PostgreSQL parked for the enterprise evaluation).
 
 ### 0D Infrastructure
-- [ ] **0D1** 🧑 Provision Linux VM (Ubuntu LTS): rootless Docker, Python 3.12, git, non-root `grafter` user; nightly backup of the SQLite file (D17).
+- [ ] **0D1** 🧑 Provision Linux VM (Debian 13 or Ubuntu LTS; a UTM VM on a Mac is fine for the sandbox, see `docs/operations.md`): rootless Docker, Python ≥ 3.12, git, non-root `grafter` user; nightly backup of the SQLite file (D17).
 - [ ] **0D2** GitHub App, split:
   - [x] **0D2a** Create the App (org-owned, contents RW, pull requests RW, issues RW, checks R, metadata R; no webhook, no workflows/administration) and install it on the sandbox repo only. Done when: permission audit passes and `grafter doctor` sees only the installed repos. (verified 2026-11-21: App grafter-codex-studio, audit PASS, #27)
   - [ ] **0D2b** 🧑 Private key on the VM (`~/.grafter/app.pem`, mode 0600, never in git); delete the workstation copy or rotate the key (needs 0D1). Install on the pilot repos at 1F1. Done when: `grafter doctor` on the VM is green.
