@@ -10,8 +10,9 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from importlib.resources import files
@@ -19,6 +20,8 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any, Self
 from uuid import uuid4
+
+from grafter.findings import SEVERITIES, Finding
 
 BUSY_TIMEOUT_MS = 5000
 _MIGRATION_NAME = re.compile(r"^(\d{4})_[A-Za-z0-9_]+\.sql$")
@@ -80,6 +83,13 @@ UPDATABLE = frozenset(
 
 class InvalidTransition(ValueError):
     """A status change not allowed by the lifecycle."""
+
+
+@dataclass(frozen=True)
+class FindingCounts:
+    new: int
+    open: int
+    gone: int
 
 
 def now() -> str:
@@ -336,6 +346,92 @@ class Store:
         return [dict(r) for r in rows]
 
     # --- maintenance ---
+
+    # --- findings (1E2) ---
+
+    def upsert_findings(
+        self, repo: str, tool: str, run_id: str, findings: Sequence[Finding]
+    ) -> FindingCounts:
+        """Record one full scan of `repo` by `tool`: new findings are added, seen ones
+        refreshed (and reopened if gone), open ones missing from this scan become `gone`."""
+        ts = now()
+        seen = {f.fingerprint: f for f in findings}
+        with self._tx() as c:
+            rows = c.execute(
+                "SELECT fingerprint, status FROM findings WHERE repo = ? AND tool = ?",
+                (repo, tool),
+            ).fetchall()
+            known = {r["fingerprint"]: r["status"] for r in rows}
+            new = 0
+            for fp, f in seen.items():
+                if fp in known:
+                    c.execute(
+                        "UPDATE findings SET status = 'open', severity = ?, line = ?, message = ?,"
+                        " last_seen_run = ?, last_seen_at = ?"
+                        " WHERE repo = ? AND tool = ? AND fingerprint = ?",
+                        (f.severity, f.line, f.message, run_id, ts, repo, tool, fp),
+                    )
+                else:
+                    new += 1
+                    c.execute(
+                        "INSERT INTO findings (id, repo, tool, fingerprint, rule_id, severity,"
+                        " path, line, message, status, first_seen_run, last_seen_run,"
+                        " first_seen_at, last_seen_at)"
+                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?)",
+                        (
+                            uuid4().hex,
+                            repo,
+                            tool,
+                            fp,
+                            f.rule_id,
+                            f.severity,
+                            f.path,
+                            f.line,
+                            f.message,
+                            run_id,
+                            run_id,
+                            ts,
+                            ts,
+                        ),
+                    )
+            gone = [fp for fp, status in known.items() if status == "open" and fp not in seen]
+            for fp in gone:
+                c.execute(
+                    "UPDATE findings SET status = 'gone' WHERE repo = ? AND tool = ?"
+                    " AND fingerprint = ?",
+                    (repo, tool, fp),
+                )
+        return FindingCounts(new=new, open=len(seen), gone=len(gone))
+
+    def list_findings(
+        self,
+        status: str = "open",
+        repo: str | None = None,
+        tool: str | None = None,
+        min_severity: str = "low",
+    ) -> list[dict[str, Any]]:
+        """Findings, most severe first. `status`: open, gone or all."""
+        where, args = [], []
+        if status != "all":
+            where.append("status = ?")
+            args.append(status)
+        if repo:
+            where.append("repo = ?")
+            args.append(repo)
+        if tool:
+            where.append("tool = ?")
+            args.append(tool)
+        order: tuple[str, ...] = SEVERITIES
+        allowed = order[order.index(min_severity) :]
+        where.append(f"severity IN ({', '.join('?' for _ in allowed)})")
+        args.extend(allowed)
+        rank = " ".join(f"WHEN '{s}' THEN {i}" for i, s in enumerate(SEVERITIES))
+        sql = (
+            "SELECT * FROM findings WHERE "
+            + " AND ".join(where)
+            + f" ORDER BY CASE severity {rank} END DESC, repo, tool, path, rule_id"
+        )
+        return [dict(r) for r in self.conn.execute(sql, args).fetchall()]
 
     def backup(self, dest: Path) -> Path:
         """Consistent online copy via the SQLite backup API."""

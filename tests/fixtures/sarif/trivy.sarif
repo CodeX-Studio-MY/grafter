@@ -1,0 +1,189 @@
+{
+ "version": "2.1.0",
+ "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+ "runs": [
+  {
+   "tool": {
+    "driver": {
+     "fullName": "Trivy Vulnerability Scanner",
+     "informationUri": "https://github.com/aquasecurity/trivy",
+     "name": "Trivy",
+     "rules": [
+      {
+       "id": "CVE-2018-18074",
+       "name": "LanguageSpecificPackageVulnerability",
+       "shortDescription": {
+        "text": "python-requests: Redirect from HTTPS to HTTP does not remove Authorization header"
+       },
+       "fullDescription": {
+        "text": "The Requests package before 2.20.0 for Python sends an HTTP Authorization header to an http URI upon receiving a same-hostname https-to-http redirect, which makes it easier for remote attackers to discover credentials by sniffing the network."
+       },
+       "defaultConfiguration": {
+        "level": "error"
+       },
+       "helpUri": "https://avd.aquasec.com/nvd/cve-2018-18074",
+       "help": {
+        "text": "Vulnerability CVE-2018-18074\nSeverity: HIGH\nPackage: requests\nFixed Version: 2.20.0\nLink: [CVE-2018-18074](https://avd.aquasec.com/nvd/cve-2018-18074)\nThe Requests package before 2.20.0 for Python sends an HTTP Authorization header to an http URI upon receiving a same-hostname https-to-http redirect, which makes it easier for remote attackers to discover credentials by sniffing the network.",
+        "markdown": "**Vulnerability CVE-2018-18074**\n| Severity | Package | Fixed Version | Link |\n| --- | --- | --- | --- |\n|HIGH|requests|2.20.0|[CVE-2018-18074](https://avd.aquasec.com/nvd/cve-2018-18074)|\n\nThe Requests package before 2.20.0 for Python sends an HTTP Authorization header to an http URI upon receiving a same-hostname https-to-http redirect, which makes it easier for remote attackers to discover credentials by sniffing the network."
+       },
+       "properties": {
+        "cvssv3_baseScore": 7.5,
+        "cvssv3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+        "precision": "very-high",
+        "security-severity": "7.5",
+        "tags": [
+         "vulnerability",
+         "security",
+         "HIGH"
+        ]
+       }
+      },
+      {
+       "id": "CVE-2024-35195",
+       "name": "LanguageSpecificPackageVulnerability",
+       "shortDescription": {
+        "text": "requests: subsequent requests to the same host ignore cert verification"
+       },
+       "fullDescription": {
+        "text": "Requests is a HTTP library. Prior to 2.32.0, when making requests through a Requests `Session`, if the first request is made with `verify=False` to disable cert verification, all subsequent requests to the same host will continue to ignore cert verification regardless of changes to the value of `verify`. This behavior will continue for the lifecycle of the connection in the connection pool. This vulnerability is fixed in 2.32.0."
+       },
+       "defaultConfiguration": {
+        "level": "warning"
+       },
+       "helpUri": "https://avd.aquasec.com/nvd/cve-2024-35195",
+       "help": {
+        "text": "Vulnerability CVE-2024-35195\nSeverity: MEDIUM\nPackage: requests\nFixed Version: 2.32.0\nLink: [CVE-2024-35195](https://avd.aquasec.com/nvd/cve-2024-35195)\nRequests is a HTTP library. Prior to 2.32.0, when making requests through a Requests `Session`, if the first request is made with `verify=False` to disable cert verification, all subsequent requests to the same host will continue to ignore cert verification regardless of changes to the value of `verify`. This behavior will continue for the lifecycle of the connection in the connection pool. This vulnerability is fixed in 2.32.0.",
+        "markdown": "**Vulnerability CVE-2024-35195**\n| Severity | Package | Fixed Version | Link |\n| --- | --- | --- | --- |\n|MEDIUM|requests|2.32.0|[CVE-2024-35195](https://avd.aquasec.com/nvd/cve-2024-35195)|\n\nRequests is a HTTP library. Prior to 2.32.0, when making requests through a Requests `Session`, if the first request is made with `verify=False` to disable cert verification, all subsequent requests to the same host will continue to ignore cert verification regardless of changes to the value of `verify`. This behavior will continue for the lifecycle of the connection in the connection pool. This vulnerability is fixed in 2.32.0."
+       },
+       "properties": {
+        "cvssv3_baseScore": 5.6,
+        "cvssv3_vector": "CVSS:3.1/AV:L/AC:H/PR:H/UI:R/S:U/C:H/I:H/A:N",
+        "precision": "very-high",
+        "security-severity": "5.6",
+        "tags": [
+         "vulnerability",
+         "security",
+         "MEDIUM"
+        ]
+       }
+      },
+      {
+       "id": "github-pat",
+       "name": "Secret",
+       "shortDescription": {
+        "text": "GitHub Personal Access Token"
+       },
+       "fullDescription": {
+        "text": "TOKEN = \"****************************************\""
+       },
+       "defaultConfiguration": {
+        "level": "error"
+       },
+       "helpUri": "https://github.com/aquasecurity/trivy/blob/main/pkg/fanal/secret/builtin-rules.go",
+       "help": {
+        "text": "Secret GitHub Personal Access Token\nSeverity: CRITICAL\nMatch: TOKEN = \"****************************************\"",
+        "markdown": "**Secret GitHub Personal Access Token**\n| Severity | Match |\n| --- | --- |\n|CRITICAL|TOKEN = \"****************************************\"|"
+       },
+       "properties": {
+        "precision": "very-high",
+        "security-severity": "9.5",
+        "tags": [
+         "secret",
+         "security",
+         "CRITICAL"
+        ]
+       }
+      }
+     ],
+     "version": "0.76.2"
+    }
+   },
+   "results": [
+    {
+     "ruleId": "CVE-2018-18074",
+     "level": "error",
+     "message": {
+      "text": "Package: requests\nInstalled Version: 2.19.0\nVulnerability CVE-2018-18074\nSeverity: HIGH\nFixed Version: 2.20.0\nLink: [CVE-2018-18074](https://avd.aquasec.com/nvd/cve-2018-18074)"
+     },
+     "locations": [
+      {
+       "physicalLocation": {
+        "artifactLocation": {
+         "uri": "requirements.txt",
+         "uriBaseId": "ROOTPATH"
+        },
+        "region": {
+         "startLine": 1,
+         "startColumn": 1,
+         "endLine": 1,
+         "endColumn": 1
+        }
+       },
+       "message": {
+        "text": "requirements.txt: requests@2.19.0"
+       }
+      }
+     ]
+    },
+    {
+     "ruleId": "CVE-2024-35195",
+     "level": "warning",
+     "message": {
+      "text": "Package: requests\nInstalled Version: 2.19.0\nVulnerability CVE-2024-35195\nSeverity: MEDIUM\nFixed Version: 2.32.0\nLink: [CVE-2024-35195](https://avd.aquasec.com/nvd/cve-2024-35195)"
+     },
+     "locations": [
+      {
+       "physicalLocation": {
+        "artifactLocation": {
+         "uri": "requirements.txt",
+         "uriBaseId": "ROOTPATH"
+        },
+        "region": {
+         "startLine": 1,
+         "startColumn": 1,
+         "endLine": 1,
+         "endColumn": 1
+        }
+       },
+       "message": {
+        "text": "requirements.txt: requests@2.19.0"
+       }
+      }
+     ]
+    },
+    {
+     "ruleId": "github-pat",
+     "level": "error",
+     "message": {
+      "text": "Artifact: src/settings.py\nType: \nSecret GitHub Personal Access Token\nSeverity: CRITICAL\nMatch: TOKEN = \"****************************************\""
+     },
+     "locations": [
+      {
+       "physicalLocation": {
+        "artifactLocation": {
+         "uri": "src/settings.py",
+         "uriBaseId": "ROOTPATH"
+        },
+        "region": {
+         "startLine": 1,
+         "startColumn": 1,
+         "endLine": 1,
+         "endColumn": 1
+        }
+       },
+       "message": {
+        "text": "src/settings.py"
+       }
+      }
+     ]
+    }
+   ],
+   "columnKind": "utf16CodeUnits",
+   "originalUriBaseIds": {
+    "ROOTPATH": {
+     "uri": "file:///workspace/"
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,250 @@
+{
+ "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+ "version": "2.1.0",
+ "runs": [
+  {
+   "addresses": [],
+   "artifacts": [
+    {
+     "length": -1,
+     "location": {
+      "index": -1,
+      "uri": "file:///workspace/requirements.txt"
+     },
+     "parentIndex": -1,
+     "roles": []
+    }
+   ],
+   "graphs": [],
+   "invocations": [],
+   "language": "en-US",
+   "logicalLocations": [],
+   "newlineSequences": [
+    "\r\n",
+    "\n"
+   ],
+   "policies": [],
+   "redactionTokens": [],
+   "results": [
+    {
+     "partialFingerprints": {
+      "primaryLocationLineHash": "371aa609d1973f123b5dcc1438826a56c7490090294c8ed2b10056f58e4698fb"
+     },
+     "attachments": [],
+     "codeFlows": [],
+     "fixes": [],
+     "graphTraversals": [],
+     "graphs": [],
+     "kind": "fail",
+     "level": "warning",
+     "locations": [
+      {
+       "annotations": [],
+       "id": -1,
+       "logicalLocations": [],
+       "physicalLocation": {
+        "artifactLocation": {
+         "index": -1,
+         "uri": "file:///workspace/requirements.txt"
+        }
+       },
+       "relationships": []
+      }
+     ],
+     "message": {
+      "arguments": [],
+      "text": "Package 'requests@2.19.0' is vulnerable to 'CVE-2024-35195' (also known as 'PYSEC-2026-1873', 'GHSA-9wx4-h78v-vm56')."
+     },
+     "rank": -1,
+     "relatedLocations": [],
+     "ruleId": "CVE-2024-35195",
+     "stacks": [],
+     "taxa": []
+    },
+    {
+     "partialFingerprints": {
+      "primaryLocationLineHash": "a0a870200497a6eeb5a1819c835104a387108ef4fa455937924ab6e3bf19fa12"
+     },
+     "attachments": [],
+     "codeFlows": [],
+     "fixes": [],
+     "graphTraversals": [],
+     "graphs": [],
+     "kind": "fail",
+     "level": "warning",
+     "locations": [
+      {
+       "annotations": [],
+       "id": -1,
+       "logicalLocations": [],
+       "physicalLocation": {
+        "artifactLocation": {
+         "index": -1,
+         "uri": "file:///workspace/requirements.txt"
+        }
+       },
+       "relationships": []
+      }
+     ],
+     "message": {
+      "arguments": [],
+      "text": "Package 'requests@2.19.0' is vulnerable to 'CVE-2018-18074' (also known as 'PYSEC-2018-28', 'GHSA-x84v-xcm2-53pg')."
+     },
+     "rank": -1,
+     "relatedLocations": [],
+     "ruleId": "CVE-2018-18074",
+     "stacks": [],
+     "taxa": []
+    },
+    {
+     "partialFingerprints": {
+      "primaryLocationLineHash": "a0a870200497a6eeb5a1819c835104a387108ef4fa455937924ab6e3bf19fa12"
+     },
+     "attachments": [],
+     "codeFlows": [],
+     "fixes": [],
+     "graphTraversals": [],
+     "graphs": [],
+     "kind": "fail",
+     "level": "warning",
+     "locations": [
+      {
+       "annotations": [],
+       "id": -1,
+       "logicalLocations": [],
+       "physicalLocation": {
+        "artifactLocation": {
+         "index": -1,
+         "uri": "file:///workspace/requirements.txt"
+        }
+       },
+       "relationships": []
+      }
+     ],
+     "message": {
+      "arguments": [],
+      "text": "Package 'requests@2.19.0' is vulnerable to 'CVE-2018-18074' (also known as 'PYSEC-2018-28', 'GHSA-x84v-xcm2-53pg')."
+     },
+     "rank": -1,
+     "relatedLocations": [],
+     "ruleId": "CVE-2018-18074",
+     "stacks": [],
+     "taxa": []
+    },
+    {
+     "partialFingerprints": {
+      "primaryLocationLineHash": "371aa609d1973f123b5dcc1438826a56c7490090294c8ed2b10056f58e4698fb"
+     },
+     "attachments": [],
+     "codeFlows": [],
+     "fixes": [],
+     "graphTraversals": [],
+     "graphs": [],
+     "kind": "fail",
+     "level": "warning",
+     "locations": [
+      {
+       "annotations": [],
+       "id": -1,
+       "logicalLocations": [],
+       "physicalLocation": {
+        "artifactLocation": {
+         "index": -1,
+         "uri": "file:///workspace/requirements.txt"
+        }
+       },
+       "relationships": []
+      }
+     ],
+     "message": {
+      "arguments": [],
+      "text": "Package 'requests@2.19.0' is vulnerable to 'CVE-2024-35195' (also known as 'PYSEC-2026-1873', 'GHSA-9wx4-h78v-vm56')."
+     },
+     "rank": -1,
+     "relatedLocations": [],
+     "ruleId": "CVE-2024-35195",
+     "stacks": [],
+     "taxa": []
+    }
+   ],
+   "runAggregates": [],
+   "taxonomies": [],
+   "threadFlowLocations": [],
+   "tool": {
+    "driver": {
+     "contents": [
+      "localizedData",
+      "nonLocalizedData"
+     ],
+     "informationUri": "https://github.com/google/osv-scanner",
+     "isComprehensive": false,
+     "language": "en-US",
+     "locations": [],
+     "name": "osv-scanner",
+     "notifications": [],
+     "rules": [
+      {
+       "deprecatedIds": [
+        "CVE-2024-35195",
+        "PYSEC-2026-1873",
+        "GHSA-9wx4-h78v-vm56"
+       ],
+       "fullDescription": {
+        "markdown": "When using a `requests.Session`, if the first request to a given origin is made with `verify=False`, TLS certificate verification may remain disabled for all subsequent requests to that origin, even if `verify=True` is explicitly specified later.\n\nThis occurs because the underlying connection is reused from the session's connection pool, causing the initial TLS verification setting to persist for the lifetime of the pooled connection. As a result, applications may unintentionally send requests without certificate verification, leading to potential man-in-the-middle attacks and compromised confidentiality or integrity.\n\nThis behavior affects versions of `requests` prior to 2.32.0.",
+        "text": "When using a `requests.Session`, if the first request to a given origin is made with `verify=False`, TLS certificate verification may remain disabled for all subsequent requests to that origin, even if `verify=True` is explicitly specified later.\n\nThis occurs because the underlying connection is reused from the session's connection pool, causing the initial TLS verification setting to persist for the lifetime of the pooled connection. As a result, applications may unintentionally send requests without certificate verification, leading to potential man-in-the-middle attacks and compromised confidentiality or integrity.\n\nThis behavior affects versions of `requests` prior to 2.32.0."
+       },
+       "help": {
+        "markdown": "**Your dependency is vulnerable to [CVE-2024-35195](https://osv.dev/CVE-2024-35195)**\n(Also published as: [PYSEC-2026-1873](https://osv.dev/PYSEC-2026-1873), [GHSA-9wx4-h78v-vm56](https://osv.dev/GHSA-9wx4-h78v-vm56), ).\n\n## [PYSEC-2026-1873](https://osv.dev/PYSEC-2026-1873)\n\n<details>\n<summary>Details</summary>\n\n> When using a `requests.Session`, if the first request to a given origin is made with `verify=False`, TLS certificate verification may remain disabled for all subsequent requests to that origin, even if `verify=True` is explicitly specified later.\n> \n> This occurs because the underlying connection is reused from the session's connection pool, causing the initial TLS verification setting to persist for the lifetime of the pooled connection. As a result, applications may unintentionally send requests without certificate verification, leading to potential man-in-the-middle attacks and compromised confidentiality or integrity.\n> \n> This behavior affects versions of `requests` prior to 2.32.0.\n\n</details>\n\n## [GHSA-9wx4-h78v-vm56](https://osv.dev/GHSA-9wx4-h78v-vm56)\n\n<details>\n<summary>Details</summary>\n\n> When using a `requests.Session`, if the first request to a given origin is made with `verify=False`, TLS certificate verification may remain disabled for all subsequent requests to that origin, even if `verify=True` is explicitly specified later.\n> \n> This occurs because the underlying connection is reused from the session's connection pool, causing the initial TLS verification setting to persist for the lifetime of the pooled connection. As a result, applications may unintentionally send requests without certificate verification, leading to potential man-in-the-middle attacks and compromised confidentiality or integrity.\n> \n> This behavior affects versions of `requests` prior to 2.32.0.\n\n</details>\n\n---\n\n### Affected Packages\n\n| Source | Package Name | Package Version |\n| --- | --- | --- |\n| lockfile:/workspace/requirements.txt | requests | 2.19.0 |\n\n## Remediation\n\nTo fix these vulnerabilities, update the vulnerabilities past the listed fixed versions below.\n\n### Fixed Versions\n\n| Vulnerability ID | Package Name | Fixed Version |\n| --- | --- | --- |\n| GHSA-9wx4-h78v-vm56 | requests | 2.32.0 |\n| PYSEC-2026-1873 | requests | 2.32.0 |\n\nIf you believe these vulnerabilities do not affect your code and wish to ignore them, add them to the ignore list in an\n`osv-scanner.toml` file located in the same directory as the lockfile containing the vulnerable dependency.\n\nSee the format and more options in our documentation here: https://google.github.io/osv-scanner/configuration/\n\nAdd or append these values to the following config files to ignore this vulnerability:\n\n`/workspace/osv-scanner.toml`\n\n```\n[[IgnoredVulns]]\nid = \"CVE-2024-35195\"\nreason = \"Your reason for ignoring this vulnerability\"\n```\n",
+        "text": "**Your dependency is vulnerable to [CVE-2024-35195](https://osv.dev/CVE-2024-35195)**\n(Also published as: [PYSEC-2026-1873](https://osv.dev/PYSEC-2026-1873), [GHSA-9wx4-h78v-vm56](https://osv.dev/GHSA-9wx4-h78v-vm56), ).\n\n## [PYSEC-2026-1873](https://osv.dev/PYSEC-2026-1873)\n\n<details>\n<summary>Details</summary>\n\n> When using a `requests.Session`, if the first request to a given origin is made with `verify=False`, TLS certificate verification may remain disabled for all subsequent requests to that origin, even if `verify=True` is explicitly specified later.\n> \n> This occurs because the underlying connection is reused from the session's connection pool, causing the initial TLS verification setting to persist for the lifetime of the pooled connection. As a result, applications may unintentionally send requests without certificate verification, leading to potential man-in-the-middle attacks and compromised confidentiality or integrity.\n> \n> This behavior affects versions of `requests` prior to 2.32.0.\n\n</details>\n\n## [GHSA-9wx4-h78v-vm56](https://osv.dev/GHSA-9wx4-h78v-vm56)\n\n<details>\n<summary>Details</summary>\n\n> When using a `requests.Session`, if the first request to a given origin is made with `verify=False`, TLS certificate verification may remain disabled for all subsequent requests to that origin, even if `verify=True` is explicitly specified later.\n> \n> This occurs because the underlying connection is reused from the session's connection pool, causing the initial TLS verification setting to persist for the lifetime of the pooled connection. As a result, applications may unintentionally send requests without certificate verification, leading to potential man-in-the-middle attacks and compromised confidentiality or integrity.\n> \n> This behavior affects versions of `requests` prior to 2.32.0.\n\n</details>\n\n---\n\n### Affected Packages\n\n| Source | Package Name | Package Version |\n| --- | --- | --- |\n| lockfile:/workspace/requirements.txt | requests | 2.19.0 |\n\n## Remediation\n\nTo fix these vulnerabilities, update the vulnerabilities past the listed fixed versions below.\n\n### Fixed Versions\n\n| Vulnerability ID | Package Name | Fixed Version |\n| --- | --- | --- |\n| GHSA-9wx4-h78v-vm56 | requests | 2.32.0 |\n| PYSEC-2026-1873 | requests | 2.32.0 |\n\nIf you believe these vulnerabilities do not affect your code and wish to ignore them, add them to the ignore list in an\n`osv-scanner.toml` file located in the same directory as the lockfile containing the vulnerable dependency.\n\nSee the format and more options in our documentation here: https://google.github.io/osv-scanner/configuration/\n\nAdd or append these values to the following config files to ignore this vulnerability:\n\n`/workspace/osv-scanner.toml`\n\n```\n[[IgnoredVulns]]\nid = \"CVE-2024-35195\"\nreason = \"Your reason for ignoring this vulnerability\"\n```\n"
+       },
+       "id": "CVE-2024-35195",
+       "name": "CVE-2024-35195",
+       "properties": {
+        "security-severity": "5.6"
+       },
+       "relationships": [],
+       "shortDescription": {
+        "markdown": "CVE-2024-35195: Requests `Session` object does not verify requests after making first request with verify=False",
+        "text": "CVE-2024-35195: Requests `Session` object does not verify requests after making first request with verify=False"
+       }
+      },
+      {
+       "deprecatedIds": [
+        "CVE-2018-18074",
+        "PYSEC-2018-28",
+        "GHSA-x84v-xcm2-53pg"
+       ],
+       "fullDescription": {
+        "markdown": "The Requests package through 2.19.1 before 2018-09-14 for Python sends an HTTP Authorization header to an http URI upon receiving a same-hostname https-to-http redirect, which makes it easier for remote attackers to discover credentials by sniffing the network.",
+        "text": "The Requests package through 2.19.1 before 2018-09-14 for Python sends an HTTP Authorization header to an http URI upon receiving a same-hostname https-to-http redirect, which makes it easier for remote attackers to discover credentials by sniffing the network."
+       },
+       "help": {
+        "markdown": "**Your dependency is vulnerable to [CVE-2018-18074](https://osv.dev/CVE-2018-18074)**\n(Also published as: [PYSEC-2018-28](https://osv.dev/PYSEC-2018-28), [GHSA-x84v-xcm2-53pg](https://osv.dev/GHSA-x84v-xcm2-53pg), ).\n\n## [PYSEC-2018-28](https://osv.dev/PYSEC-2018-28)\n\n<details>\n<summary>Details</summary>\n\n> The Requests package before 2.20.0 for Python sends an HTTP Authorization header to an http URI upon receiving a same-hostname https-to-http redirect, which makes it easier for remote attackers to discover credentials by sniffing the network.\n\n</details>\n\n## [GHSA-x84v-xcm2-53pg](https://osv.dev/GHSA-x84v-xcm2-53pg)\n\n<details>\n<summary>Details</summary>\n\n> The Requests package through 2.19.1 before 2018-09-14 for Python sends an HTTP Authorization header to an http URI upon receiving a same-hostname https-to-http redirect, which makes it easier for remote attackers to discover credentials by sniffing the network.\n\n</details>\n\n---\n\n### Affected Packages\n\n| Source | Package Name | Package Version |\n| --- | --- | --- |\n| lockfile:/workspace/requirements.txt | requests | 2.19.0 |\n\n## Remediation\n\nTo fix these vulnerabilities, update the vulnerabilities past the listed fixed versions below.\n\n### Fixed Versions\n\n| Vulnerability ID | Package Name | Fixed Version |\n| --- | --- | --- |\n| GHSA-x84v-xcm2-53pg | requests | 2.20.0 |\n| PYSEC-2018-28 | requests | 2.20.0, c45d7c49ea75133e52ab22a8e9e13173938e36ff |\n\nIf you believe these vulnerabilities do not affect your code and wish to ignore them, add them to the ignore list in an\n`osv-scanner.toml` file located in the same directory as the lockfile containing the vulnerable dependency.\n\nSee the format and more options in our documentation here: https://google.github.io/osv-scanner/configuration/\n\nAdd or append these values to the following config files to ignore this vulnerability:\n\n`/workspace/osv-scanner.toml`\n\n```\n[[IgnoredVulns]]\nid = \"CVE-2018-18074\"\nreason = \"Your reason for ignoring this vulnerability\"\n```\n",
+        "text": "**Your dependency is vulnerable to [CVE-2018-18074](https://osv.dev/CVE-2018-18074)**\n(Also published as: [PYSEC-2018-28](https://osv.dev/PYSEC-2018-28), [GHSA-x84v-xcm2-53pg](https://osv.dev/GHSA-x84v-xcm2-53pg), ).\n\n## [PYSEC-2018-28](https://osv.dev/PYSEC-2018-28)\n\n<details>\n<summary>Details</summary>\n\n> The Requests package before 2.20.0 for Python sends an HTTP Authorization header to an http URI upon receiving a same-hostname https-to-http redirect, which makes it easier for remote attackers to discover credentials by sniffing the network.\n\n</details>\n\n## [GHSA-x84v-xcm2-53pg](https://osv.dev/GHSA-x84v-xcm2-53pg)\n\n<details>\n<summary>Details</summary>\n\n> The Requests package through 2.19.1 before 2018-09-14 for Python sends an HTTP Authorization header to an http URI upon receiving a same-hostname https-to-http redirect, which makes it easier for remote attackers to discover credentials by sniffing the network.\n\n</details>\n\n---\n\n### Affected Packages\n\n| Source | Package Name | Package Version |\n| --- | --- | --- |\n| lockfile:/workspace/requirements.txt | requests | 2.19.0 |\n\n## Remediation\n\nTo fix these vulnerabilities, update the vulnerabilities past the listed fixed versions below.\n\n### Fixed Versions\n\n| Vulnerability ID | Package Name | Fixed Version |\n| --- | --- | --- |\n| GHSA-x84v-xcm2-53pg | requests | 2.20.0 |\n| PYSEC-2018-28 | requests | 2.20.0, c45d7c49ea75133e52ab22a8e9e13173938e36ff |\n\nIf you believe these vulnerabilities do not affect your code and wish to ignore them, add them to the ignore list in an\n`osv-scanner.toml` file located in the same directory as the lockfile containing the vulnerable dependency.\n\nSee the format and more options in our documentation here: https://google.github.io/osv-scanner/configuration/\n\nAdd or append these values to the following config files to ignore this vulnerability:\n\n`/workspace/osv-scanner.toml`\n\n```\n[[IgnoredVulns]]\nid = \"CVE-2018-18074\"\nreason = \"Your reason for ignoring this vulnerability\"\n```\n"
+       },
+       "id": "CVE-2018-18074",
+       "name": "CVE-2018-18074",
+       "properties": {
+        "security-severity": "7.5"
+       },
+       "relationships": [],
+       "shortDescription": {
+        "markdown": "CVE-2018-18074: Insufficiently Protected Credentials in Requests",
+        "text": "CVE-2018-18074: Insufficiently Protected Credentials in Requests"
+       }
+      }
+     ],
+     "supportedTaxonomies": [],
+     "taxa": [],
+     "version": "2.7.0"
+    },
+    "extensions": []
+   },
+   "translations": [],
+   "versionControlProvenance": [],
+   "webRequests": [],
+   "webResponses": []
+  }
+ ],
+ "properties": {}
+}
