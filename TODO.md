@@ -116,7 +116,8 @@ Never tick an unverified item. If an item is split, add sub-items instead of tic
 - [ ] **1E1** Renovate config template, split:
   - [x] **1E1a** `deploy/renovate/renovate.json` (`ai/deps-*` branches, patch bumps grouped, no automerge). Done when: valid JSON, reviewed.
   - [ ] **1E1b** 🧑 Enable Renovate on the sandbox repo. Done when: a Renovate PR on the sandbox repo.
-- [ ] **1E2** Semgrep + Trivy + OSV-Scanner in the sandbox; findings stored as candidate tasks (not acted on in phase 1). Done when: `grafter findings` lists them.
+- [x] **1E2** Trivy + OSV-Scanner (offline, D20) in the sandbox; findings stored as candidate tasks (not acted on in phase 1). Done when: `grafter findings` lists them. (#33)
+- [ ] **1E3** ⚖️ Code-pattern scanning (Semgrep deferred in D20): Grafter's own MIT rules, or Semgrep under an accepted licence. Done when: decision recorded in `docs/decisions.md`.
 
 ### 1F Go live on the pilot
 - [ ] **1F1** 🧑 Install on pilot repos with `max_prs_per_night: 1`; dry-run 3 nights; review logs.
