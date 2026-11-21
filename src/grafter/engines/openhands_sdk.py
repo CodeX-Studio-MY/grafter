@@ -59,6 +59,7 @@ class SdkSandbox:
             model=llm.model,
             base_url=llm.base_url,
             api_key=SecretStr(llm.api_key),
+            max_output_tokens=llm.max_output,
             num_retries=2,
         )
         conv = Conversation(
@@ -83,7 +84,7 @@ class SdkSandbox:
                     break
                 if status in (St.ERROR, St.STUCK, St.PAUSED, St.WAITING_FOR_CONFIRMATION):
                     outcome.status = "error"
-                    outcome.detail = f"status {status.value}"
+                    outcome.detail = f"status {status.value}{_last_error(conv)}"
                     break
                 if outcome.tokens > limits.max_tokens:
                     conv.pause()
@@ -97,6 +98,21 @@ class SdkSandbox:
         finally:
             conv.close()
         return outcome
+
+
+def _last_error(conv: Any) -> str:
+    """The latest error event's message (conversation or agent level), for the reason."""
+    try:
+        events = list(conv.state.events)
+    except Exception:  # remote state may be gone; the status alone still says enough
+        return ""
+    for ev in reversed(events):
+        name = type(ev).__name__
+        if name == "ConversationErrorEvent":
+            return f": {ev.code}: {ev.detail}"[:400]
+        if name == "AgentErrorEvent":
+            return f": {ev.error}"[:400]
+    return ""
 
 
 def _metrics_into(conv: Any, outcome: AgentOutcome) -> None:

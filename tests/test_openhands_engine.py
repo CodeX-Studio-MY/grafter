@@ -169,6 +169,8 @@ def test_run_applies_patch_and_reports_gateway_cost(
     assert result.cost_usd == 0.21  # gateway spend, not the SDK's 0.2
     assert result.tokens_used == 900 + 100 + 3000 + 400
     assert PLAN in result.summary and "domain: grading" in result.summary
+    # First line becomes the PR title: a plain one-liner, not the charter ref.
+    assert result.summary.splitlines()[0] == "Add tests for src/acme_harvest/grading.py"
     assert (workspace.path / "tests/test_grading_more.py").is_file()
 
     # One run key for both models, capped at this task's share; deleted at the end.
@@ -188,7 +190,8 @@ def test_run_applies_patch_and_reports_gateway_cost(
     assert "GRAFTER_EOL" in box.calls[3][1]
     assert ARCHIVE_PATH in box.uploads and box.uploads[ARCHIVE_PATH][:2] == b"\x1f\x8b"
     prompt, llm, limits = box.calls[2][1]
-    assert llm == LlmSpec("litellm_proxy/claude-sonnet-5-5", "http://litellm:4000", RUN_KEY)
+    # max_output caps each call: LiteLLM reserves input + max output against the key budget.
+    assert llm == LlmSpec("litellm_proxy/claude-sonnet-5-5", "http://litellm:4000", RUN_KEY, 8192)
     assert limits == AgentLimits(60, 0.5, 25_000 - 1000, 1800.0)
     assert PLAN in prompt and "tests/**" in prompt
     assert box.calls[5][1] == PATCH_PATH
