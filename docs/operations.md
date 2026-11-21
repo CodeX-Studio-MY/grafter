@@ -93,7 +93,7 @@ grafter doctor --config ~/.grafter/grafter.yaml
 
 `doctor` prints `ok`, `warn` or `fail` per check (config, home, kill switch, lock, database, git, Docker, runner, engine, gateway, GitHub App and the repos it can see) and exits 1 if any check fails.
 
-Then review the night's PRs on GitHub. Approve, reject, or comment to ask for rework.
+Then open the **Grafter nightly reports** issue in the charter repo (label `grafter-report`). After every real run, Grafter adds a comment there with the PRs it opened, its rejections and their reasons, the tokens used and the cost. Dry runs only write `~/.grafter/runs/<run-id>/report.md`. Keep the issue open; if it is closed, Grafter opens a new one. Review the night's PRs from there: approve, reject, or comment to ask for rework.
 
 ## 9. Stop Grafter (kill switch)
 

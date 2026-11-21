@@ -271,6 +271,8 @@ def run(
     for err in summary.errors:
         typer.echo(f"  error {err['repo']}: {err['error'][:200]}")
     typer.echo(f"report: {summary.report_path}")
+    if summary.report_url:
+        typer.echo(f"report comment: {summary.report_url}")
     if summary.kill_switch:
         raise typer.Exit(EXIT_KILL_SWITCH)
     if summary.failed:

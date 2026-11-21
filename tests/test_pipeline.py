@@ -128,6 +128,8 @@ class FakeGitHub:
         self.pulls: list[dict[str, Any]] = []
         self.labels: set[str] = set()
         self.fail_create: Exception | None = None
+        self.comments: list[tuple[str, int, str]] = []
+        self.fail_comment: Exception | None = None
 
     def ensure_labels(self, repo: str, labels: dict[str, str]) -> list[str]:
         assert repo == GITHUB_REPO
@@ -156,6 +158,16 @@ class FakeGitHub:
 
     def find_open_pr(self, repo: str, fingerprint: str) -> dict[str, Any] | None:
         return next((p for p in self.pulls if marker(fingerprint) in p["body"]), None)
+
+    def ensure_report_issue(self, repo: str) -> int:
+        assert repo == GITHUB_REPO
+        return 7
+
+    def comment(self, repo: str, number: int, body: str) -> str:
+        if self.fail_comment is not None:
+            raise self.fail_comment
+        self.comments.append((repo, number, body))
+        return f"https://github.example/{repo}/issues/{number}#c{len(self.comments)}"
 
 
 class Engines:
@@ -621,3 +633,62 @@ def test_usd_budget_stops_run_and_cost_is_recorded(
     assert run_row(cfg, s.run_id)["cost_usd"] == 0.5
     report = Path(s.report_path).read_text("utf-8")
     assert "- Cost: $0.50 (budget $0.50)" in report
+
+
+# --- report as an issue comment (TODO 1D4b) --------------------------------------------
+
+
+def test_real_run_posts_report_comment(
+    make_cfg: Callable[..., Config], sandbox_origin: Path
+) -> None:
+    cfg = make_cfg(limits={"max_prs_per_night": 1})
+    gh = FakeGitHub()
+    s = run_night(cfg, deps_for(sandbox_origin, Engines(GOOD), gh), dry_run=False)
+    assert len(gh.comments) == 1
+    repo, number, body = gh.comments[0]
+    assert (repo, number) == (GITHUB_REPO, 7)
+    assert s.run_id in body and "pull/1" in body
+    assert body == Path(s.report_path).read_text("utf-8")
+    assert s.report_url == f"https://github.example/{GITHUB_REPO}/issues/7#c1"
+    assert "report_posted" in events(cfg, s)
+
+
+def test_dry_run_posts_no_comment(make_cfg: Callable[..., Config], sandbox_origin: Path) -> None:
+    cfg = make_cfg(limits={"max_prs_per_night": 1})
+    gh = FakeGitHub()
+    s = run_night(cfg, deps_for(sandbox_origin, Engines(GOOD), gh), dry_run=True)
+    assert gh.comments == [] and s.report_url == ""
+
+
+def test_report_post_failure_does_not_fail_run(
+    make_cfg: Callable[..., Config], sandbox_origin: Path
+) -> None:
+    from grafter.github import GitHubError
+
+    cfg = make_cfg(limits={"max_prs_per_night": 1})
+    gh = FakeGitHub()
+    gh.fail_comment = GitHubError(
+        "POST x -> HTTP 502: https://x-access-token:ghs_SECRETSECRET1234@github.com"
+    )
+    s = run_night(cfg, deps_for(sandbox_origin, Engines(GOOD), gh), dry_run=False)
+    assert s.stopped_reason == STOP_MAX_PRS and not s.failed
+    assert s.report_url == ""
+    assert run_row(cfg, s.run_id)["status"] == "ok"
+    log = (Path(s.report_path).parent / "run.jsonl").read_text("utf-8")
+    assert "report_post_failed" in log and "ghs_SECRET" not in log
+
+
+def test_comment_body_is_capped() -> None:
+    from grafter.report import COMMENT_MAX, comment_body
+
+    assert comment_body("short", "/r/report.md") == "short"
+    long = comment_body("x" * (COMMENT_MAX + 500), "/r/report.md")
+    assert len(long) <= COMMENT_MAX
+    assert long.endswith("Truncated: the full report is at `/r/report.md` on the Grafter host.\n")
+
+
+def test_report_has_one_cost_line(make_cfg: Callable[..., Config], sandbox_origin: Path) -> None:
+    cfg = make_cfg(limits={"max_prs_per_night": 1})
+    s = run_night(cfg, deps_for(sandbox_origin, Engines(GOOD), FakeGitHub()), dry_run=True)
+    lines = [ln for ln in Path(s.report_path).read_text("utf-8").splitlines() if "Cost" in ln]
+    assert lines == ["- Cost: $0.00 (budget $5.00)"]
