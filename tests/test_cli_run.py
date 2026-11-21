@@ -256,3 +256,63 @@ def test_summary_printing_and_kill_switch_mid_run(
     assert "error api: GitError: boom" in result.output
     assert "stopped: kill switch engaged" in result.output
     assert "report comment: https://github.example/acme/api/issues/7#c1" in result.output
+
+
+# --- grafter scan / grafter findings (TODO 1E2) ------------------------------------------
+
+
+def test_scan_needs_docker_runner(tmp_path: Path, sandbox_origin: Path) -> None:
+    cfg = write_cfg(tmp_path, sandbox_origin)  # runner: local
+    result = invoke("scan", "--config", str(cfg))
+    assert result.exit_code == 2 and "scanning needs runner: docker" in result.output
+
+
+def test_scan_then_findings(
+    tmp_path: Path, sandbox_origin: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from grafter import cli
+    from grafter.findings import Finding
+    from grafter.scanners import ToolResult
+
+    class Fake:
+        def update(self) -> list[str]:
+            return []
+
+        def scan(self, workdir: Path) -> list[ToolResult]:
+            return [
+                ToolResult(
+                    "trivy",
+                    [
+                        Finding("trivy", "CVE-2018-18074", "high", "requirements.txt", 1, "old"),
+                        Finding("trivy", "github-pat", "critical", "src/settings.py", 1, "pat"),
+                    ],
+                ),
+                ToolResult(
+                    "osv",
+                    [Finding("osv", "CVE-2018-18074", "high", "requirements.txt", None, "old")],
+                ),
+            ]
+
+    monkeypatch.setattr(cli, "scanner_for", lambda cfg: Fake())
+    cfg = write_cfg(tmp_path, sandbox_origin, runner="docker")
+    result = invoke("scan", "--config", str(cfg))
+    assert result.exit_code == 0, result.output
+    assert "stopped: scan only" in result.output
+    assert "findings api trivy: 2 open (2 new, 0 gone)" in result.output
+    assert "findings api osv: 1 open (1 new, 0 gone)" in result.output
+
+    listed = invoke("findings", "--config", str(cfg))
+    assert listed.exit_code == 0, listed.output
+    lines = listed.output.strip().splitlines()
+    assert lines[-1] == "3 finding(s)"
+    assert lines[0].startswith("critical trivy api") and "src/settings.py:1" in lines[0]
+    high = invoke("findings", "--config", str(cfg), "--tool", "osv", "--min-severity", "high")
+    assert high.output.strip().splitlines()[-1] == "1 finding(s)"
+    assert invoke("findings", "--config", str(cfg), "--min-severity", "bad").exit_code == 2
+    assert invoke("findings", "--config", str(cfg), "--status", "bad").exit_code == 2
+
+
+def test_findings_without_database(tmp_path: Path, sandbox_origin: Path) -> None:
+    cfg = write_cfg(tmp_path, sandbox_origin)
+    result = invoke("findings", "--config", str(cfg))
+    assert result.exit_code == 0 and "no findings yet" in result.output

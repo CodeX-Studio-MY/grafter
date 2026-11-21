@@ -3,6 +3,7 @@ real pytest on the sandbox template, FakeEngine for the agent, a fake GitHub in-
 
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Callable, Mapping, Sequence
 from datetime import date
@@ -692,3 +693,95 @@ def test_report_has_one_cost_line(make_cfg: Callable[..., Config], sandbox_origi
     s = run_night(cfg, deps_for(sandbox_origin, Engines(GOOD), FakeGitHub()), dry_run=True)
     lines = [ln for ln in Path(s.report_path).read_text("utf-8").splitlines() if "Cost" in ln]
     assert lines == ["- Cost: $0.00 (budget $5.00)"]
+
+
+# --- scanners (TODO 1E2) ---------------------------------------------------------------
+
+
+class FakeScanner:
+    """Stand-in for DockerScanner: fixed results per call, records what it scanned."""
+
+    def __init__(self, rounds: list[list[Any]], update_failures: list[str] | None = None) -> None:
+        self.rounds = rounds
+        self.update_failures = update_failures or []
+        self.updates = 0
+        self.scanned: list[Path] = []
+
+    def update(self) -> list[str]:
+        self.updates += 1
+        return self.update_failures
+
+    def scan(self, workdir: Path) -> list[Any]:
+        self.scanned.append(workdir)
+        if not self.rounds:
+            raise RuntimeError("scanner exploded")
+        return self.rounds.pop(0)
+
+
+def _finding(rule: str) -> Any:
+    from grafter.findings import Finding
+
+    return Finding("trivy", rule, "high", "requirements.txt", 1, f"vuln {rule}")
+
+
+def test_scan_only_stores_findings_and_skips_tasks(
+    make_cfg: Callable[..., Config], sandbox_origin: Path
+) -> None:
+    from grafter.pipeline import STOP_SCAN_ONLY
+    from grafter.scanners import ToolResult
+
+    cfg = make_cfg()
+    engines = Engines(GOOD)
+    scanner = FakeScanner(
+        [[ToolResult("trivy", [_finding("CVE-1"), _finding("CVE-2")]), ToolResult("osv", [])]]
+    )
+    deps = deps_for(sandbox_origin, engines)
+    deps.scanner = scanner
+    s = run_night(cfg, deps, dry_run=True, scan_only=True)
+    assert s.stopped_reason == STOP_SCAN_ONLY
+    assert engines.targets == []  # no tasks, no engine
+    assert scanner.updates == 1 and len(scanner.scanned) == 1
+    assert {(f["tool"], f["new"], f["open"], f["gone"]) for f in s.findings} == {
+        ("trivy", 2, 2, 0),
+        ("osv", 0, 0, 0),
+    }
+    with Store(cfg.paths().db_file) as st:
+        assert sorted(r["rule_id"] for r in st.list_findings()) == ["CVE-1", "CVE-2"]
+    report = Path(s.report_path).read_text("utf-8")
+    assert "## Findings (candidate tasks, not acted on in phase 1)" in report
+    assert "`api` trivy: 2 open (2 new, 0 gone)" in report
+    assert "scan_done" in events(cfg, s)
+
+
+def test_scan_runs_before_tasks_on_main_and_failures_dont_stop(
+    make_cfg: Callable[..., Config], sandbox_origin: Path
+) -> None:
+    from grafter.scanners import ToolResult
+
+    cfg = make_cfg(limits={"max_prs_per_night": 1})
+    scanner = FakeScanner(
+        [[ToolResult("trivy", error="exit 2: ghs_SECRETSECRET1234 boom")]],
+        update_failures=["osv: database update failed"],
+    )
+    deps = deps_for(sandbox_origin, Engines(GOOD), FakeGitHub())
+    deps.scanner = scanner
+    s = run_night(cfg, deps, dry_run=False)
+    assert len(s.prs) == 1  # the night went on
+    assert s.scan_errors and s.scan_errors[0]["tool"] == "trivy"
+    assert "ghs_SECRET" not in json.dumps(s.scan_errors)
+    log = (Path(s.report_path).parent / "run.jsonl").read_text("utf-8")
+    assert "scan_update_failed" in log and "scan_failed" in log and "ghs_SECRET" not in log
+    assert "trivy: scan failed" in Path(s.report_path).read_text("utf-8")
+
+
+def test_scanner_exception_is_contained(
+    make_cfg: Callable[..., Config], sandbox_origin: Path
+) -> None:
+    cfg = make_cfg()
+    deps = deps_for(sandbox_origin, Engines({}))
+    deps.scanner = FakeScanner([])  # raises on scan
+    s = run_night(cfg, deps, dry_run=True, scan_only=True)
+    assert s.scan_errors == [
+        {"repo": "api", "tool": "scanners", "error": "RuntimeError: scanner exploded"}
+    ]
+    assert not s.failed

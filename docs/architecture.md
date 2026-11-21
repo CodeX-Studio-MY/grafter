@@ -30,7 +30,7 @@ Scheduler ─► Orchestrator ─► Agent workers ──► LLM gateway (LiteLL
 | Review UI | GitHub PRs | Next.js dashboard |
 | State | SQLite on local disk, WAL mode (D17) | same; PostgreSQL only if the enterprise evaluation needs it |
 | Git | GitHub App | same |
-| Scanners | Renovate, Semgrep, Trivy, OSV-Scanner | same |
+| Scanners | Renovate, Trivy, OSV-Scanner (D20; Semgrep deferred, 1E3) | same |
 | Sandbox | Rootless Docker | gVisor option |
 
 ## Where it runs

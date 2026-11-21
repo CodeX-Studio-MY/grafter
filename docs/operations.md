@@ -95,6 +95,21 @@ grafter doctor --config ~/.grafter/grafter.yaml
 
 Then open the **Grafter nightly reports** issue in the charter repo (label `grafter-report`). After every real run, Grafter adds a comment there with the PRs it opened, its rejections and their reasons, the tokens used and the cost. Dry runs only write `~/.grafter/runs/<run-id>/report.md`. Keep the issue open; if it is closed, Grafter opens a new one. Review the night's PRs from there: approve, reject, or comment to ask for rework.
 
+### Scanner findings (TODO 1E2, D20)
+
+Every run, real or dry, scans each repo's fresh `main` with **Trivy** (dependencies, secrets, misconfiguration) and **OSV-Scanner** (dependencies). Findings are **candidate tasks only**: phase 1 never acts on them.
+
+```bash
+grafter scan --config ~/.grafter/grafter.yaml        # scan now, without the engine; read-only
+grafter findings --config ~/.grafter/grafter.yaml    # open findings, most severe first
+grafter findings --min-severity high --tool trivy --config ~/.grafter/grafter.yaml
+grafter findings --status gone --config ~/.grafter/grafter.yaml   # fixed since first seen
+```
+
+- **Nothing about a repo leaves the host.** The databases are refreshed into the Docker volume `grafter-scan-cache`, by a step that has no repo content. The volume is about 2 GB: the Trivy DB is 1.8 GB, and OSV is roughly 40–250 MB per ecosystem in `scanning.osv_ecosystems`.
+- **Scans run offline.** They use `--network none`, uid 10001 and no capabilities, on a copy of the repo, with the cache mounted read-only. A scanner that fails is logged as `scan_failed`; the night carries on.
+- **Turn scanning off** with `scanning: {tools: []}`. It also needs `runner: docker`.
+
 ## 9. Stop Grafter (kill switch)
 
 Either of these stops the next run, and a running one between tasks:

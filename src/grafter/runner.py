@@ -8,6 +8,7 @@ mounted) and only the files a caller names in `outputs` are copied back.
 from __future__ import annotations
 
 import io
+import re
 import shlex
 import shutil
 import subprocess
@@ -15,7 +16,7 @@ import sys
 import tarfile
 import time
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Protocol
@@ -104,8 +105,20 @@ class LocalRunner:
 SANDBOX_USER = "10001:10001"  # the `sandbox` user in sandboxes/*/Dockerfile
 WORKDIR = "/workspace"
 DOCKER_TIMEOUT_S = 120  # create / cp / rm
+
+
 # Extract the tar on stdin as the sandbox user, then exec the command (no shell parsing of it).
-ENTRY = ["sh", "-c", f'tar -xf - -C {WORKDIR} && cd {WORKDIR} && exec "$@"', "sh"]
+def entry(workdir: str) -> list[str]:
+    """Extract the tar on stdin into `workdir` (created if missing), then exec the command."""
+    return [
+        "sh",
+        "-c",
+        f'mkdir -p {workdir} && tar -xf - -C {workdir} && cd {workdir} && exec "$@"',
+        "sh",
+    ]
+
+
+ENTRY = entry(WORKDIR)
 HARDENING = (
     "--network",
     "none",
@@ -120,6 +133,10 @@ HARDENING = (
     "--cpus",
     "2",
 )
+
+
+_VOLUME_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")  # named volumes only, never host paths
+_ENV_NAME = re.compile(r"[A-Z_][A-Z0-9_]*")
 
 
 class RunnerError(RuntimeError):
@@ -180,10 +197,30 @@ class DockerRunner:
     """Each `run` is a new container from `image`: no network, no capabilities, non-root,
     resource limits, no host mounts. The tree goes in as a tar on stdin."""
 
-    def __init__(self, image: str, docker: Sequence[str] | None = None) -> None:
+    def __init__(
+        self,
+        image: str,
+        docker: Sequence[str] | None = None,
+        volumes: Sequence[tuple[str, str]] = (),
+        env: Mapping[str, str] | None = None,
+        workdir: str = WORKDIR,
+    ) -> None:
+        """`volumes`: (named volume, container path) pairs, always mounted read-only (1E2's
+        scanner cache). `env`: plain, non-secret settings for the container."""
         if not image:
             raise RunnerError("no sandbox image")
+        for volume, target in volumes:
+            if not _VOLUME_NAME.fullmatch(volume) or not target.startswith("/") or ":" in target:
+                raise RunnerError(f"bad volume mount: {volume!r} -> {target!r}")
+        for key in env or {}:
+            if not _ENV_NAME.fullmatch(key):
+                raise RunnerError(f"bad env name: {key!r}")
+        if not workdir.startswith("/") or " " in workdir:
+            raise RunnerError(f"bad workdir: {workdir!r}")
         self.image = image
+        self.workdir = workdir
+        self.volumes = list(volumes)
+        self.env = dict(env or {})
         exe = shutil.which("docker")
         self.docker = list(docker) if docker else [exe or "docker"]
 
@@ -200,8 +237,14 @@ class DockerRunner:
         )
 
     def run(
-        self, cmd: str, cwd: Path, timeout: float = 900, outputs: Sequence[str] = ()
+        self,
+        cmd: str,
+        cwd: Path,
+        timeout: float = 900,
+        outputs: Sequence[str] = (),
+        out_dir: Path | None = None,
     ) -> CmdResult:
+        """`out_dir`: where `outputs` land (default `cwd`); scanners keep them out of the tree."""
         args = shlex.split(cmd, posix=True)
         if not args:
             raise ValueError("empty command")
@@ -219,12 +262,13 @@ class DockerRunner:
                 *HARDENING,
                 "--user",
                 SANDBOX_USER,
-                "-w",
-                WORKDIR,
+                *(f for v, t in self.volumes for f in ("-v", f"{v}:{t}:ro")),
+                *(f for k, v in self.env.items() for f in ("-e", f"{k}={v}")),
+                # No -w: Docker would create the dir as root; the entry script makes it.
                 "--entrypoint",
-                ENTRY[0],
+                "sh",
                 self.image,
-                *ENTRY[1:],
+                *entry(self.workdir)[1:],
                 *args,
             )
             if created.returncode != 0:
@@ -240,9 +284,9 @@ class DockerRunner:
             )
             for out in outputs:
                 rel = _safe_output(out)
-                copied = self._docker("cp", f"{name}:{WORKDIR}/{rel.as_posix()}", "-")
+                copied = self._docker("cp", f"{name}:{self.workdir}/{rel.as_posix()}", "-")
                 if copied.returncode == 0:
-                    extract_output(copied.stdout, out, cwd)
+                    extract_output(copied.stdout, out, out_dir or cwd)
             return result
         finally:
             self._docker("rm", "-f", name)

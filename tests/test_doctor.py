@@ -294,3 +294,25 @@ def test_github_app_rejected_fails(
     checks = by_name(run_checks(cfg, environ={"GRAFTER_GITHUB_APP_PRIVATE_KEY": rsa_keys[0]}))
     assert checks["github"].status == "fail"
     assert "HTTP 401" in checks["github"].detail
+
+
+def test_scanners_check(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    assert doctor._scanners(_cfg_obj(tmp_path)).detail.startswith("off")  # runner: local
+    cfg = _cfg_obj(tmp_path, runner="docker")
+    present = {"images": True, "volume": True}
+
+    def fake_run(args: list[str], **kw: Any) -> subprocess.CompletedProcess[bytes]:
+        ok = present["volume"] if args[1] == "volume" else present["images"]
+        return subprocess.CompletedProcess(args, 0 if ok else 1, b"", b"")
+
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: "/usr/bin/docker")
+    monkeypatch.setattr(doctor.subprocess, "run", fake_run)
+    ok = doctor._scanners(cfg)
+    assert (ok.status, ok.detail) == ("ok", "trivy, osv; cache grafter-scan-cache")
+    present.update(images=False, volume=False)
+    warn = doctor._scanners(cfg)
+    assert (
+        warn.status == "warn" and "trivy, osv" in warn.detail and "no database cache" in warn.detail
+    )
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: None)
+    assert doctor._scanners(cfg).status == "fail"

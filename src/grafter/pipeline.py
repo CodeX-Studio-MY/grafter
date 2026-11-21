@@ -30,6 +30,7 @@ from grafter.prbody import LABEL_COLORS, fingerprint_for, render_pr
 from grafter.report import REPORT_FILE, comment_body, render_report
 from grafter.runlog import RunLog, new_run_id
 from grafter.runner import CommandRunner
+from grafter.scanners import Scanner, ToolResult
 from grafter.store import TRANSITIONS, ChangeStatus, Store
 
 ACTOR = "grafter"
@@ -43,6 +44,7 @@ STOP_MAX_PRS = "max_prs_per_night reached"
 STOP_BUDGET = "token budget reached"
 STOP_USD = "USD budget reached"
 STOP_KILL = "kill switch engaged"
+STOP_SCAN_ONLY = "scan only"
 
 _USERINFO = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*://)[^/@]*@")
 
@@ -76,6 +78,8 @@ class RunDeps:
     today: Callable[[], date] = date.today
     # Per-repo runner (DockerRunner picks the repo's sandbox image); default: `runner`.
     runner_for: Callable[[RepoConfig], CommandRunner] | None = None
+    # Dependency/secret scanners (1E2). None = no scanning (e.g. runner: local).
+    scanner: Scanner | None = None
 
     def runner_of(self, repo: RepoConfig) -> CommandRunner:
         return self.runner_for(repo) if self.runner_for else self.runner
@@ -94,6 +98,8 @@ class RunSummary:
     errors: list[dict[str, Any]] = field(default_factory=list)  # repo-level failures
     report_path: str = ""
     report_url: str = ""  # the report's issue comment (real runs only)
+    findings: list[dict[str, Any]] = field(default_factory=list)  # per repo + tool counts
+    scan_errors: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def kill_switch(self) -> bool:
@@ -166,9 +172,16 @@ def _post_report(
         log.event("report_post_failed", repo=repo, error=scrub(_error(e))[:NOTE_MAX])
 
 
-def run_night(cfg: Config, deps: RunDeps, dry_run: bool, run_id: str | None = None) -> RunSummary:
+def run_night(
+    cfg: Config,
+    deps: RunDeps,
+    dry_run: bool,
+    run_id: str | None = None,
+    scan_only: bool = False,
+) -> RunSummary:
     """Run one night. Raises `LockHeld` or `KillSwitchEngaged` before anything else happens;
-    every later failure ends up in the summary (`stopped_reason`, `rejected`, `errors`)."""
+    every later failure ends up in the summary (`stopped_reason`, `rejected`, `errors`).
+    `scan_only`: sync each repo and run the scanners, nothing else (`grafter scan`)."""
     if not dry_run and deps.github is None:
         raise ValueError("a real run needs a GitHub client; use a dry run without one")
     paths = cfg.paths()
@@ -182,7 +195,7 @@ def run_night(cfg: Config, deps: RunDeps, dry_run: bool, run_id: str | None = No
             summary = RunSummary(run_id=run_id, dry_run=dry_run)
             status = "failed"
             try:
-                _Night(cfg, deps, paths, store, log, summary).run()
+                _Night(cfg, deps, paths, store, log, summary, scan_only).run()
                 status = "stopped" if summary.kill_switch else "ok"
             except Exception as e:
                 summary.stopped_reason = f"error: {_error(e)}"
@@ -223,9 +236,11 @@ class _Night:
         store: Store,
         log: RunLog,
         summary: RunSummary,
+        scan_only: bool = False,
     ) -> None:
         self.cfg, self.deps, self.paths = cfg, deps, paths
         self.store, self.log, self.summary = store, log, summary
+        self.scan_only = scan_only
 
     # --- run / repo ----------------------------------------------------------------------
 
@@ -240,7 +255,10 @@ class _Night:
             max_prs=cfg.limits.max_prs_per_night,
             token_budget=cfg.limits.token_budget_per_night,
         )
-        if focus != ChangeType.TEST:
+        if self.deps.scanner is not None:
+            for failure in self.deps.scanner.update():
+                log.event("scan_update_failed", error=scrub(failure)[:NOTE_MAX])
+        if focus != ChangeType.TEST and not self.scan_only:
             self.summary.stopped_reason = (
                 f"nightly focus {focus.value!r} not supported in phase 1 (test only)"
             )
@@ -265,12 +283,17 @@ class _Night:
             except Exception as e:
                 self.summary.errors.append({"repo": repo.name, "error": _error(e)})
                 log.event("repo_error", repo=repo.name, error=_error(e))
+        if self.scan_only and not self.summary.stopped_reason:
+            self.summary.stopped_reason = STOP_SCAN_ONLY
         if not self.summary.stopped_reason:
             full = len(self.summary.prs) >= cfg.limits.max_prs_per_night
             self.summary.stopped_reason = STOP_MAX_PRS if full else STOP_DONE
 
     def _repo(self, repo: RepoConfig, git: GitRepo, charter: Charter) -> None:
         self._fresh(git, repo, SCRATCH_BRANCH)
+        self._scan(repo, git)
+        if self.scan_only:
+            return
         baseline = measure_coverage(self.deps.runner_of(repo), git.path, repo)
         found = find_test_tasks(
             repo, charter, baseline.files, limit=self.cfg.limits.max_prs_per_night + EXTRA_TASKS
@@ -285,6 +308,35 @@ class _Night:
             if self._should_stop():
                 return
             self._task(repo, git, charter, baseline, task)
+
+    def _scan(self, repo: RepoConfig, git: GitRepo) -> None:
+        """Scan the fresh `main` checkout (never agent code) and store the findings (1E2).
+        Findings are candidate tasks only; a scanner failure never stops the night."""
+        scanner = self.deps.scanner
+        if scanner is None:
+            return
+        try:
+            results = scanner.scan(git.path)
+        except Exception as e:
+            results = [ToolResult("scanners", error=_error(e))]
+        for res in results:
+            if res.error:
+                err = {"repo": repo.name, "tool": res.tool, "error": scrub(res.error)[:NOTE_MAX]}
+                self.summary.scan_errors.append(err)
+                self.log.event("scan_failed", **err)
+                continue
+            counts = self.store.upsert_findings(
+                repo.name, res.tool, self.summary.run_id, res.findings
+            )
+            entry = {
+                "repo": repo.name,
+                "tool": res.tool,
+                "new": counts.new,
+                "open": counts.open,
+                "gone": counts.gone,
+            }
+            self.summary.findings.append(entry)
+            self.log.event("scan_done", **entry)
 
     def _should_stop(self) -> bool:
         s, limits = self.summary, self.cfg.limits
