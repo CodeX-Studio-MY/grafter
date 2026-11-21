@@ -171,6 +171,14 @@ class TokenProvider(Protocol):
 
 _REPO_RE = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 PER_PAGE = 100
+REPORT_TITLE = "Grafter nightly reports"
+REPORT_LABEL = "grafter-report"
+REPORT_COLOR = "5319e7"
+REPORT_ISSUE_BODY = (
+    "Grafter posts one comment here after every real nightly run: PRs opened, rejections "
+    "with reasons, tokens and cost (TODO 1D4b). Keep this issue open; closing it makes "
+    "Grafter open a new one."
+)
 MAX_PAGES = 100  # 10,000 items; a guard against a server that never stops paging
 
 
@@ -276,3 +284,38 @@ class GitHubClient:
             ):
                 return pr
         return None
+
+    def ensure_report_issue(self, repo: str) -> int:
+        """Number of the open `Grafter nightly reports` issue Grafter created (a bot), or a
+        new one. Look-alikes from humans, other titles and PRs are ignored."""
+        _check_repo(repo)
+        self.ensure_labels(repo, {REPORT_LABEL: REPORT_COLOR})
+        path = f"/repos/{repo}/issues"
+        for issue in self._paginate(path, {"state": "open", "labels": REPORT_LABEL}):
+            user = issue.get("user")
+            if (
+                "pull_request" not in issue
+                and issue.get("title") == REPORT_TITLE
+                and isinstance(user, dict)
+                and user.get("type") == "Bot"
+                and isinstance(issue.get("number"), int)
+            ):
+                return int(issue["number"])
+        created = self._request(
+            "POST",
+            path,
+            {"title": REPORT_TITLE, "body": REPORT_ISSUE_BODY, "labels": [REPORT_LABEL]},
+        )
+        if not isinstance(created, dict) or not isinstance(created.get("number"), int):
+            raise GitHubError("unexpected create-issue response")
+        return int(created["number"])
+
+    def comment(self, repo: str, number: int, body: str) -> str:
+        """Post `body` on issue `number`; returns the comment's URL."""
+        resp = self._request(
+            "POST", f"/repos/{_check_repo(repo)}/issues/{number}/comments", {"body": body}
+        )
+        url = resp.get("html_url") if isinstance(resp, dict) else None
+        if not isinstance(url, str):
+            raise GitHubError("unexpected create-comment response")
+        return url

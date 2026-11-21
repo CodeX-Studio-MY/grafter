@@ -10,6 +10,15 @@ if TYPE_CHECKING:  # pragma: no cover
     from grafter.pipeline import RunSummary
 
 REPORT_FILE = "report.md"
+COMMENT_MAX = 60_000  # GitHub's comment limit is 65,536 characters
+
+
+def comment_body(text: str, path: str) -> str:
+    """The report as an issue comment, cut to `COMMENT_MAX` with a pointer to the full file."""
+    if len(text) <= COMMENT_MAX:
+        return text
+    note = f"\n\n---\nTruncated: the full report is at `{path}` on the Grafter host.\n"
+    return text[: COMMENT_MAX - len(note)] + note
 
 
 def _cell(text: Any) -> str:
@@ -32,7 +41,6 @@ def render_report(summary: RunSummary, cfg: Config) -> str:
         f"- PRs opened: {len(real)} (limit {cfg.limits.max_prs_per_night})",
         f"- Tokens: {summary.tokens:,} (budget {cfg.limits.token_budget_per_night:,})",
         f"- Cost: ${summary.cost_usd:.2f} (budget ${cfg.limits.usd_budget_per_night:.2f})",
-        "- Cost: not tracked yet (gateway spend lands with 1C3)",
         f"- Repos: {', '.join(r.name for r in cfg.repos)}",
         "",
         "## Pull requests",

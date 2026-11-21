@@ -246,6 +246,7 @@ def test_summary_printing_and_kill_switch_mid_run(
             errors=[{"repo": "api", "error": "GitError: boom"}],
             stopped_reason=STOP_KILL,
             report_path="r.md",
+            report_url="https://github.example/acme/api/issues/7#c1",
         )
 
     monkeypatch.setattr(cli, "run_night", fake_run_night)
@@ -254,3 +255,4 @@ def test_summary_printing_and_kill_switch_mid_run(
     assert "PR ai/test-x: src/a.py" in result.output
     assert "error api: GitError: boom" in result.output
     assert "stopped: kill switch engaged" in result.output
+    assert "report comment: https://github.example/acme/api/issues/7#c1" in result.output

@@ -65,6 +65,8 @@ class FakeGitHub:
         self.repos: list[str] = []
         self.labels: dict[str, list[str]] = {}
         self.pulls: dict[str, list[dict[str, Any]]] = {}
+        self.issues: dict[str, list[dict[str, Any]]] = {}
+        self.comments: list[tuple[str, int, str]] = []
         fake = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -149,6 +151,37 @@ class FakeGitHub:
         if (method, path) == ("GET", "/installation/repositories"):
             repos = [{"full_name": r} for r in self.repos]
             return 200, {"total_count": len(repos), "repositories": self.page(repos, query)}
+        m = re.fullmatch(r"/repos/([^/]+/[^/]+)/issues/(\d+)/comments", path)
+        if m and method == "POST":
+            repo, num = m.group(1), int(m.group(2))
+            if not any(i["number"] == num for i in self.issues.get(m.group(1), [])):
+                return 404, {"message": "Not Found"}
+            self.comments.append((repo, num, body["body"]))
+            n = len(self.comments)
+            return 201, {"id": n, "html_url": f"https://github.example/{repo}/issues/{num}#c{n}"}
+        m = re.fullmatch(r"/repos/([^/]+/[^/]+)/issues", path)
+        if m:
+            repo = m.group(1)
+            issues = self.issues.setdefault(repo, [])
+            if method == "POST":
+                issue = {
+                    "number": 100 + len(issues),
+                    "state": "open",
+                    "title": body["title"],
+                    "body": body.get("body"),
+                    "labels": [{"name": n} for n in body.get("labels", [])],
+                    "user": {"login": "grafter-test[bot]", "type": "Bot"},
+                }
+                issues.append(issue)
+                return 201, issue
+            label = query.get("labels", [""])[0]
+            hits = [
+                i
+                for i in issues
+                if i["state"] == query.get("state", ["open"])[0]
+                and (not label or label in [lb["name"] for lb in i["labels"]])
+            ]
+            return 200, self.page(hits, query)
         m = re.fullmatch(r"/repos/([^/]+/[^/]+)/(labels|pulls|issues/(\d+)/labels)", path)
         if not m:
             return 404, {"message": "Not Found"}
@@ -187,6 +220,21 @@ class FakeGitHub:
         pulls.append(
             {"number": len(pulls) + 1, "state": state, "body": body, "head": {"ref": head}}
         )
+
+    def add_issue(
+        self, repo: str, title: str, labels: list[str], user_type: str = "Bot", pull: bool = False
+    ) -> None:
+        issues = self.issues.setdefault(repo, [])
+        issue: dict[str, Any] = {
+            "number": 100 + len(issues),
+            "state": "open",
+            "title": title,
+            "labels": [{"name": n} for n in labels],
+            "user": {"login": "someone", "type": user_type},
+        }
+        if pull:
+            issue["pull_request"] = {"url": "x"}
+        issues.append(issue)
 
     def paths(self) -> list[tuple[str, str]]:
         return [(c[0], c[1]) for c in self.calls]
@@ -506,3 +554,47 @@ def test_find_open_pr_rejects_bad_fingerprint(client: GitHubClient, fake: FakeGi
     with pytest.raises(GitHubError, match="fingerprint"):
         client.find_open_pr(REPO, "")
     assert fake.calls == []
+
+
+# --- nightly report issue (TODO 1D4b) ------------------------------------------------
+
+
+def test_ensure_report_issue_creates_once_then_reuses(
+    client: GitHubClient, fake: FakeGitHub
+) -> None:
+    from grafter.github import REPORT_LABEL, REPORT_TITLE
+
+    first = client.ensure_report_issue("acme/api")
+    assert first == 100
+    issue = fake.issues["acme/api"][0]
+    assert issue["title"] == REPORT_TITLE
+    assert [lb["name"] for lb in issue["labels"]] == [REPORT_LABEL]
+    assert "Grafter" in issue["body"]
+    assert REPORT_LABEL in fake.labels["acme/api"]
+    assert client.ensure_report_issue("acme/api") == first
+    assert len(fake.issues["acme/api"]) == 1
+
+
+def test_ensure_report_issue_ignores_lookalikes(client: GitHubClient, fake: FakeGitHub) -> None:
+    from grafter.github import REPORT_LABEL, REPORT_TITLE
+
+    fake.add_issue("acme/api", REPORT_TITLE, [REPORT_LABEL], user_type="User")  # a human's
+    fake.add_issue("acme/api", "Something else", [REPORT_LABEL])  # other title
+    fake.add_issue("acme/api", REPORT_TITLE, [REPORT_LABEL], pull=True)  # a PR
+    assert client.ensure_report_issue("acme/api") == 103
+    assert len(fake.issues["acme/api"]) == 4
+
+
+def test_comment_returns_url(client: GitHubClient, fake: FakeGitHub) -> None:
+    number = client.ensure_report_issue("acme/api")
+    url = client.comment("acme/api", number, "# report")
+    assert url == "https://github.example/acme/api/issues/100#c1"
+    assert fake.comments == [("acme/api", 100, "# report")]
+
+
+def test_comment_errors_are_github_errors(client: GitHubClient, fake: FakeGitHub) -> None:
+    with pytest.raises(GitHubError, match="404"):
+        client.comment("acme/api", 999, "x")
+    fake.fail[("POST", "/repos/acme/api/issues/5/comments")] = (200, "[]")
+    with pytest.raises(GitHubError, match="unexpected"):
+        client.comment("acme/api", 5, "x")

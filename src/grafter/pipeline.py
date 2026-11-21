@@ -27,7 +27,7 @@ from grafter.gitops import scrub as scrub_urls
 from grafter.guard import Tier, check
 from grafter.lock import RunLock, check_kill_switch
 from grafter.prbody import LABEL_COLORS, fingerprint_for, render_pr
-from grafter.report import REPORT_FILE, render_report
+from grafter.report import REPORT_FILE, comment_body, render_report
 from grafter.runlog import RunLog, new_run_id
 from grafter.runner import CommandRunner
 from grafter.store import TRANSITIONS, ChangeStatus, Store
@@ -57,6 +57,10 @@ class PullRequestApi(Protocol):
     ) -> dict[str, Any]: ...
 
     def find_open_pr(self, repo: str, fingerprint: str) -> dict[str, Any] | None: ...
+
+    def ensure_report_issue(self, repo: str) -> int: ...
+
+    def comment(self, repo: str, number: int, body: str) -> str: ...
 
 
 @dataclass
@@ -89,6 +93,7 @@ class RunSummary:
     stopped_reason: str = ""
     errors: list[dict[str, Any]] = field(default_factory=list)  # repo-level failures
     report_path: str = ""
+    report_url: str = ""  # the report's issue comment (real runs only)
 
     @property
     def kill_switch(self) -> bool:
@@ -147,6 +152,20 @@ def sync_repo(url: str, dest: Path) -> GitRepo:
             GitRepo(dest).git("remote", "set-url", "origin", strip_credentials(url))
 
 
+def _post_report(
+    cfg: Config, github: PullRequestApi, summary: RunSummary, report: Path, log: RunLog
+) -> None:
+    """Comment the report on the solution's report issue (1D4b). Never fails the run."""
+    repo = cfg.charter_repo_config().github
+    try:
+        body = comment_body(report.read_text("utf-8"), str(report))
+        number = github.ensure_report_issue(repo)
+        summary.report_url = github.comment(repo, number, body)
+        log.event("report_posted", repo=repo, issue=number, url=summary.report_url)
+    except Exception as e:  # GitHub down, permissions, ...: the report stays local
+        log.event("report_post_failed", repo=repo, error=scrub(_error(e))[:NOTE_MAX])
+
+
 def run_night(cfg: Config, deps: RunDeps, dry_run: bool, run_id: str | None = None) -> RunSummary:
     """Run one night. Raises `LockHeld` or `KillSwitchEngaged` before anything else happens;
     every later failure ends up in the summary (`stopped_reason`, `rejected`, `errors`)."""
@@ -179,6 +198,8 @@ def run_night(cfg: Config, deps: RunDeps, dry_run: bool, run_id: str | None = No
                 with report.open("w", encoding="utf-8", newline="\n") as fh:
                     fh.write(render_report(summary, cfg))
                 summary.report_path = str(report)
+                if not dry_run and deps.github is not None:
+                    _post_report(cfg, deps.github, summary, report, log)
                 log.event(
                     "run_finished",
                     report=str(report),
