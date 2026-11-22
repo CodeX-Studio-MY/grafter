@@ -1,6 +1,6 @@
 # Contributing
 
-Grafter is pre-alpha and in a private pilot. Contributions open with the public release (roadmap phase 3).
+Grafter is pre-alpha and in a private pilot. Contributions open with the public release (roadmap phase 5).
 
 - Python 3.12+, `pip install -e ".[dev]"`, `ruff check .`, `pytest`.
 - One change per PR.

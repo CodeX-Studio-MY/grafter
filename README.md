@@ -4,6 +4,8 @@
 
 Grafter is an open-source AI maintainer you embed into **one** software solution. Every night it finds work, writes fixes, tests them and opens one branch per change. Humans approve; only approved branches are grafted onto `main`. A **Solution Charter** keeps every change aligned with the solution's purpose, so the system evolves without drifting (no 长歪了).
 
+Grafter earns autonomy step by step ([roadmap](docs/roadmap.md)): tests → low-risk fixes → normal-risk fixes → **solution self-evolution** (UI/UX, performance, current best practice, and new features when the charter allows it) → public release. Every change, at every step, is a PR a human approves.
+
 **Status:** pre-alpha · private pilot · not ready for use.
 
 ## Core ideas
